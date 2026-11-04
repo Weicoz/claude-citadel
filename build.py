@@ -768,25 +768,33 @@ def validate_with_mihomo(config_path):
 def publish_all_to_gist(gist_id, output_files, gh_token=None):
     """将所有客户端配置同步发布至 Secret Gist。"""
     log(f"正在发布全量 6 客户端配置到 Gist ({gist_id}) ...")
-    cmd = ["gh", "gist", "edit", gist_id]
+    payload = {"files": {}}
     for filename, path in output_files.items():
-        cmd.extend(["-a", filename, str(path)])
+        payload["files"][filename] = {"content": path.read_text(encoding="utf-8")}
 
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    if res.returncode == 0:
-        log("通过 gh CLI 成功发布全部客户端配置至 Gist！", "SUCCESS")
-        return True
+    # 1. 尝试使用本机 gh CLI API
+    try:
+        res = subprocess.run(
+            ["gh", "api", "-X", "PATCH", f"/gists/{gist_id}", "--input", "-"],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True
+        )
+        if res.returncode == 0:
+            log("通过 gh CLI 成功发布全部客户端配置至 Gist！", "SUCCESS")
+            return True
+        else:
+            log(f"gh API 调用未成功: {res.stderr.strip()}，尝试回退至 REST API...", "WARN")
+    except Exception as e:
+        log(f"gh CLI 运行异常: {e}，尝试回退至 REST API...", "WARN")
 
+    # 2. 回退使用 Python 原生 urllib REST API
     token = gh_token or os.environ.get("GH_TOKEN") or os.environ.get("GIST_PAT")
     if not token:
         log("缺少 GitHub Token，无法调用 REST API 更新 Gist！", "ERROR")
         return False
 
     url = f"https://api.github.com/gists/{gist_id}"
-    payload = {"files": {}}
-    for filename, path in output_files.items():
-        payload["files"][filename] = {"content": path.read_text(encoding="utf-8")}
-
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -822,36 +830,36 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     output_files = {
-        "clash.yaml": OUTPUT_DIR / "clash.yaml",
-        "stash.yaml": OUTPUT_DIR / "stash.yaml",
-        "surge.conf": OUTPUT_DIR / "surge.conf",
-        "loon.conf": OUTPUT_DIR / "loon.conf",
-        "shadowrocket.conf": OUTPUT_DIR / "shadowrocket.conf",
-        "qx.conf": OUTPUT_DIR / "qx.conf"
+        "claude-citadel-clash.yaml": OUTPUT_DIR / "claude-citadel-clash.yaml",
+        "claude-citadel-stash.yaml": OUTPUT_DIR / "claude-citadel-stash.yaml",
+        "claude-citadel-surge.conf": OUTPUT_DIR / "claude-citadel-surge.conf",
+        "claude-citadel-loon.conf": OUTPUT_DIR / "claude-citadel-loon.conf",
+        "claude-citadel-shadowrocket.conf": OUTPUT_DIR / "claude-citadel-shadowrocket.conf",
+        "claude-citadel-qx.conf": OUTPUT_DIR / "claude-citadel-qx.conf"
     }
 
     # 1. 渲染 Clash 与 Stash
     log("正在渲染 Clash / Mihomo 配置...")
     clash_cfg = build_clash_stash(TEMPLATES_DIR / "clash.yaml", profile_data, client_type="clash")
-    with open(output_files["clash.yaml"], "w", encoding="utf-8") as f:
+    with open(output_files["claude-citadel-clash.yaml"], "w", encoding="utf-8") as f:
         yaml.dump(clash_cfg, f, allow_unicode=True, sort_keys=False)
 
     log("正在渲染 Stash 配置...")
     stash_cfg = build_clash_stash(TEMPLATES_DIR / "stash.yaml", profile_data, client_type="stash")
-    with open(output_files["stash.yaml"], "w", encoding="utf-8") as f:
+    with open(output_files["claude-citadel-stash.yaml"], "w", encoding="utf-8") as f:
         yaml.dump(stash_cfg, f, allow_unicode=True, sort_keys=False)
 
     # 2. 渲染 Surge, Loon, Shadowrocket, Quantumult X
     log("正在渲染 Surge / Loon / Shadowrocket / Quantumult X 配置...")
-    output_files["surge.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "surge.conf", profile_data, "surge"), encoding="utf-8")
-    output_files["loon.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "loon.conf", profile_data, "loon"), encoding="utf-8")
-    output_files["shadowrocket.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "shadowrocket.conf", profile_data, "shadowrocket"), encoding="utf-8")
-    output_files["qx.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "qx.conf", profile_data, "qx"), encoding="utf-8")
+    output_files["claude-citadel-surge.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "surge.conf", profile_data, "surge"), encoding="utf-8")
+    output_files["claude-citadel-loon.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "loon.conf", profile_data, "loon"), encoding="utf-8")
+    output_files["claude-citadel-shadowrocket.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "shadowrocket.conf", profile_data, "shadowrocket"), encoding="utf-8")
+    output_files["claude-citadel-qx.conf"].write_text(build_ini_based_client(TEMPLATES_DIR / "qx.conf", profile_data, "qx"), encoding="utf-8")
 
     # 3. 离线内核校验
     if not args.skip_validation:
-        ok_clash = validate_with_mihomo(output_files["clash.yaml"])
-        ok_stash = validate_with_mihomo(output_files["stash.yaml"])
+        ok_clash = validate_with_mihomo(output_files["claude-citadel-clash.yaml"])
+        ok_stash = validate_with_mihomo(output_files["claude-citadel-stash.yaml"])
         if not (ok_clash and ok_stash):
             log("配置内核检验未通过，紧急熔断终止，未发布到任何远程端！", "ERROR")
             sys.exit(1)

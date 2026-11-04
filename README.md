@@ -9,12 +9,12 @@
 ## ✨ 核心特性
 
 - **6 大主流客户端全适配**：
-  - **Clash / Mihomo** (`clash.yaml`) - 桌面端与 Android 标配，支持 Meta 增强特性与 MRS 格式
-  - **Stash** (`stash.yaml`) - iOS / macOS 平台规则优化版，双重兼容 header 格式
-  - **Surge** (`surge.conf`) - iOS / macOS 专业级规则、`underlying-proxy` 链式代理与 `policy-path`
-  - **Loon** (`loon.conf`) - iOS 现代轻量级代理，原生 `[Proxy Chain]` 链式代理
-  - **Shadowrocket** (`shadowrocket.conf`) - iOS 小火箭一键订阅，原生 `chain=中转节点`
-  - **Quantumult X** (`qx.conf`) - iOS 经典神机代理，Filter Remote 与小写规则自动转译
+  - **Clash / Mihomo** (`claude-citadel-clash.yaml`) - 桌面端与 Android 标配，支持 Meta 增强特性与 MRS 格式
+  - **Stash** (`claude-citadel-stash.yaml`) - iOS / macOS 平台规则优化版，双重兼容 header 格式
+  - **Surge** (`claude-citadel-surge.conf`) - iOS / macOS 专业级规则、`underlying-proxy` 链式代理与 `policy-path`
+  - **Loon** (`claude-citadel-loon.conf`) - iOS 现代轻量级代理，原生 `[Proxy Chain]` 链式代理
+  - **Shadowrocket** (`claude-citadel-shadowrocket.conf`) - iOS 小火箭一键订阅，原生 `chain=中转节点`
+  - **Quantumult X** (`claude-citadel-qx.conf`) - iOS 经典神机代理，Filter Remote 与小写规则自动转译
 - **Claude 独立出口物理隔离与代理链控制**：
   - Claude / Anthropic 专用节点（原生住宅 IP、自建 VPS、专线）物理隔离于常规中转池，日常流量与测速绝不经过 Claude 节点。
   - 支持 **`use_relay_chain: true / false`** 开关（经由中转链式前置拨号 vs 直接直连拨号）。
@@ -36,12 +36,12 @@
 flowchart TD
     subgraph GIST ["个人私有 Secret Gist"]
         IN["📄 profile.yaml (机场订阅 + 独立出口 + DIY 规则)"]
-        OUT1["⚙️ clash.yaml (Clash / Mihomo)"]
-        OUT2["⚙️ stash.yaml (Stash)"]
-        OUT3["⚙️ surge.conf (Surge)"]
-        OUT4["⚙️ loon.conf (Loon)"]
-        OUT5["⚙️ shadowrocket.conf (Shadowrocket)"]
-        OUT6["⚙️ qx.conf (Quantumult X)"]
+        OUT1["⚙️ claude-citadel-clash.yaml (Clash / Mihomo)"]
+        OUT2["⚙️ claude-citadel-stash.yaml (Stash)"]
+        OUT3["⚙️ claude-citadel-surge.conf (Surge)"]
+        OUT4["⚙️ claude-citadel-loon.conf (Loon)"]
+        OUT5["⚙️ claude-citadel-shadowrocket.conf (Shadowrocket)"]
+        OUT6["⚙️ claude-citadel-qx.conf (Quantumult X)"]
     end
 
     subgraph ACTIONS ["GitHub Actions 自动化流水线"]
@@ -204,15 +204,15 @@ custom_rules:
 ### 第三步：触发编译与获取 Raw 链接
 1. 进入仓库的 **Actions** 页面，选择 **自动构建与同步订阅** -> 点击 **Run workflow**。
 2. 编译成功后，刷新你的 Gist 页面，会看到仓库自动回写了全套 6 大客户端配置文件：
-   - `clash.yaml`
-   - `stash.yaml`
-   - `surge.conf`
-   - `loon.conf`
-   - `shadowrocket.conf`
-   - `qx.conf`
+   - `claude-citadel-clash.yaml`
+   - `claude-citadel-stash.yaml`
+   - `claude-citadel-surge.conf`
+   - `claude-citadel-loon.conf`
+   - `claude-citadel-shadowrocket.conf`
+   - `claude-citadel-qx.conf`
 3. 点击对应文件右上角的 **Raw** 按钮，浏览器地址栏中的链接即为最终订阅链接，格式为：
    ```text
-   https://gist.githubusercontent.com/<你的用户名>/<你的GIST_ID>/raw/<文件名>
+   https://gist.githubusercontent.com/<你的用户名>/<你的GIST_ID>/raw/claude-citadel-<客户端文件名>
    ```
 
 ---
@@ -222,40 +222,57 @@ custom_rules:
 获得上述 Raw 链接后，直接在对应客户端导入即可：
 
 ### 1. Clash / Mihomo (Clash Verge / Mihomo Party / Flclash)
-1. 复制 `.../raw/clash.yaml`。
+1. 复制 `.../raw/claude-citadel-clash.yaml`。
 2. 打开客户端 -> 进入 **订阅/配置 (Profiles)** -> 粘贴链接并点击 **导入/下载**。
 3. 规则模式选择 **Rule (规则模式)**。
 
 ### 2. Stash (iOS / macOS)
-1. 复制 `.../raw/stash.yaml`。
+1. 复制 `.../raw/claude-citadel-stash.yaml`。
 2. 打开 Stash -> 进入 **配置列表** -> 点击 **从 URL 下载** -> 粘贴链接并下载。
 3. 勾选使用该配置。
 
 ### 3. Surge (iOS / macOS)
-1. 复制 `.../raw/surge.conf`。
+1. 复制 `.../raw/claude-citadel-surge.conf`。
 2. 打开 Surge -> 进入 **配置 (Profiles)** -> 选择 **从 URL 安装配置 (Install Profile from URL)**。
 3. 粘贴链接并确认生效。
 
 ### 4. Loon (iOS)
-1. 复制 `.../raw/loon.conf`。
+1. 复制 `.../raw/claude-citadel-loon.conf`。
 2. 打开 Loon -> 进入 **配置 (Configuration)** -> 点击右上角新建/下载远程配置。
 3. 粘贴链接更新并加载配置。
 
 ### 5. Shadowrocket 小火箭 (iOS)
-1. 复制 `.../raw/shadowrocket.conf`。
+1. 复制 `.../raw/claude-citadel-shadowrocket.conf`。
 2. 打开小火箭 -> 点击右上角 `+` -> 类型选择 **Subscribe (订阅)**。
 3. 粘贴链接，保存后点击更新节点与分流。
 
 ### 6. Quantumult X (iOS)
-1. 复制 `.../raw/qx.conf`。
+1. 复制 `.../raw/claude-citadel-qx.conf`。
 2. 打开 Quantumult X -> 进入右下角风车设置 -> 选择 **下载配置文件**。
 3. 粘贴链接覆盖加载。
 
 ---
 
-## 🛠️ 本地开发、调试与 Skill 同步
+## 🤖 零本地环境：使用仓库专属 Skill 自动化配置云端 Action
 
-除了云端 GitHub Actions 自动编译外，也可以在本地一键编译：
+> [!TIP]
+> **绝大多数用户完全不需要克隆仓库到本地，也不需要安装 Python 或任何运行环境。**
+> 直接在你的 AI Agent（Claude Code、Antigravity、Codex 等）中加载本项目自带的 **`claude-citadel`** Skill，即可全自动完成云端配置与定时更新维护！
+
+本仓库已内置开箱即用的专属 Skill：[`skills/claude-citadel/SKILL.md`](file:///Users/weicoz/File/git/claude-citadel/skills/claude-citadel/SKILL.md)（同时软链至 `.agents/skills/claude-citadel` 与 `.claude/skills/claude-citadel`）。
+
+### Skill 自动化引导涵盖：
+1. **GitHub 权限引导**：指导生成仅含 `gist` 权限的 Personal Access Token 并配置为仓库 Secret（`GIST_PAT` 与 `GIST_ID`）。
+2. **`profile.yaml` 辅助生成**：协助用户梳理机场订阅、Claude 专用节点、代理链开关与 DIY 自定义策略组。
+3. **触发云端 Actions 编译**：调用 GitHub Actions 自动拉取上游规则、编译 6 大客户端配置并通过 `mihomo -t` 内核语法校验。
+4. **回传 6 端订阅链接**：自动获取带 `claude-citadel-` 前缀的 6 端 Raw 链接并提供对应客户端一键导入指引。
+5. **托管全自动定时更新**：解释每日定时轮询机制，以及后续用户在网页端修改 `profile.yaml` 后的静默热更新流程。
+
+---
+
+## 🛠️ 可选：本地开发与离线校验
+
+如果你是开发者或希望在本地调试规则，可以使用以下命令：
 
 ```sh
 # 1. 运行本地回归测试套件 (包含 6 项结构与内核离线校验)
@@ -263,7 +280,4 @@ python3 -m unittest discover -s tests -v
 
 # 2. 本地渲染并输出到 output/
 python3 build.py --profile profile.example.yaml
-
-# 3. 使用专属 Skill (终端免密无凭据回显)
-/weicoz-claude-citadel
 ```
