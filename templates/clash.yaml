@@ -145,10 +145,6 @@ proxy-groups:
   - 🇺🇸 海外出口
   - ⚡ 自动择优
   - 🛟 Fallback
-- name: 🕸️ 组网访问
-  type: select
-  proxies:
-  - DIRECT
 - name: 🇭🇰 香港节点
   type: select
   filter: (?i)港|hk|hongkong|hong kong

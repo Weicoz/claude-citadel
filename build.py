@@ -462,13 +462,6 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.append(g)
             new_groups.extend(airport_select_groups)
 
-        elif g_name == "🕸️ 组网访问":
-            if mesh_custom_names:
-                g["proxies"] = ["DIRECT"] + mesh_custom_names
-            else:
-                g["proxies"] = ["DIRECT"]
-            new_groups.append(g)
-
         elif g_name in region_regexes:
             if relay_provider_ids:
                 g["use"] = relay_provider_ids
@@ -479,6 +472,21 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
 
         else:
             new_groups.append(g)
+
+    # 动态插入「🕸️ 组网访问」：仅当用户配置了 mesh_proxies 或 custom_rules.mesh 时启用
+    has_mesh = bool(mesh_custom_names or (custom_rules.get("mesh", {}) or {}).get("rules") or (custom_rules.get("mesh", {}) or {}).get("remote_rulesets"))
+    if has_mesh:
+        mesh_group = {
+            "name": "🕸️ 组网访问",
+            "type": "select",
+            "proxies": ["DIRECT"] + mesh_custom_names if mesh_custom_names else ["DIRECT"]
+        }
+        insert_idx = len(new_groups)
+        for idx, g in enumerate(new_groups):
+            if g.get("name") == "🔗 直连改道":
+                insert_idx = idx + 1
+                break
+        new_groups.insert(insert_idx, mesh_group)
 
     # 保证每个策略组都合法，无空 use 或空 proxies 导致内核崩溃
     for g in new_groups:
@@ -615,13 +623,16 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         content = content.replace("🇺🇸 海外出口 = select,DIRECT", f"🇺🇸 海外出口 = select,{target_line}")
         content = content.replace("static=🇺🇸 海外出口, direct", f"static=🇺🇸 海外出口, {target_line}")
 
-    # 插入组网指定节点 (EasyTier 等)
-    if mesh_names:
-        mesh_target_surge = ", ".join(["DIRECT"] + mesh_names)
-        mesh_target_qx = ", ".join(["direct"] + mesh_names)
-        content = content.replace("🕸️ 组网访问 = select, DIRECT", f"🕸️ 组网访问 = select, {mesh_target_surge}")
-        content = content.replace("🕸️ 组网访问 = select,DIRECT", f"🕸️ 组网访问 = select,{mesh_target_surge}")
-        content = content.replace("static=🕸️ 组网访问, direct", f"static=🕸️ 组网访问, {mesh_target_qx}")
+    # 动态插入「🕸️ 组网访问」：仅当用户配置了 mesh_proxies 或 custom_rules.mesh 时启用
+    has_mesh = bool(mesh_names or (custom_rules.get("mesh", {}) or {}).get("rules") or (custom_rules.get("mesh", {}) or {}).get("remote_rulesets"))
+    if has_mesh:
+        if client_type in ["surge", "shadowrocket", "loon"]:
+            mesh_target = ", ".join(["DIRECT"] + mesh_names)
+            content = content.replace("🔗 直连改道", f"🕸️ 组网访问 = select, {mesh_target}\n🔗 直连改道")
+        elif client_type == "qx":
+            mesh_target = ", ".join(["direct"] + mesh_names)
+            qx_mesh_line = f"static=🕸️ 组网访问, {mesh_target}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"
+            content = content.replace("static=🔗 直连改道", f"{qx_mesh_line}\nstatic=🔗 直连改道")
 
     # 5. 注入自定义分流规则 (Direct / Relay / Claude Exit)
     injected_rules = []
