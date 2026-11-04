@@ -1,0 +1,18 @@
+# 依赖与二进制
+bin/mihomo
+bin/mihomo.gz
+output/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# 本地个人配置 (防止误提交敏感信息，用户只在 Gist 维护 profile.yaml)
+profile.yaml
+
+# 系统与环境
+.DS_Store
+.venv/
+venv/

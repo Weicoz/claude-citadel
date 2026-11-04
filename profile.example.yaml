@@ -1,0 +1,83 @@
+# ==============================================================================
+# Claude Sub Hub - 统一配置文件 (profile.yaml)
+# 在你的 GitHub Secret Gist 中维护此文件，Action 将自动编译为全平台 6 大客户端配置
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Claude 专用出口 (独立出口，专供 Claude / Anthropic 分流，日常流量不走这里)
+# ------------------------------------------------------------------------------
+claude_exits:
+  # 是否强制经由「🔀 中转节点」代理链拨号：
+  # - true: 自动为 Claude 节点追加 dialer-proxy / underlying-proxy / chain（适合国内直连不通的住宅 IP / VPS）
+  # - false: 直接直连拨号（适合原生可直连的住宅 IP 或专线）
+  use_relay_chain: true
+
+  # 形态 A：手动配置节点 (如波特兰 VPS / 独立住宅 IP / 特殊代理出口)
+  # 支持 socks5, http, ss, trojan, vmess 等所有主流协议
+  custom_proxies:
+    - name: "🇺🇸 波特兰专用出口"
+      type: socks5
+      server: 198.51.100.1
+      port: 1080
+      # username: "user"
+      # password: "password"
+      # 单节点覆盖开关：指定 dialer-proxy 或留空
+      # dialer-proxy: "🔀 中转节点"
+
+  # 形态 B：专用订阅 (如果有专门解锁 Claude 的独享专线机场/订阅)
+  subscriptions: []
+    # - name: "Claude专线"
+    #   emoji: "🛡️"
+    #   url: "https://sub.special-claude.com/api/v1/client/subscribe?token=xxx"
+
+# ------------------------------------------------------------------------------
+# 2. 通用中转 / 常规业务节点 (用于日常上网、OpenAI、Google AI、Steam、Telegram 等)
+# ------------------------------------------------------------------------------
+relays:
+  # 形态 A：机场订阅列表 (支持 1 到 4 家或更多，按行添加即可)
+  subscriptions:
+    - name: "猫咪云"
+      emoji: "🐱"
+      url: "https://sub.miaona.com/api/v1/client/subscribe?token=example_token_1"
+      user_agent: "clash.meta"
+
+    - name: "良心专线"
+      emoji: "❤️"
+      url: "https://sub.liangxin.com/api/v1/client/subscribe?token=example_token_2"
+      user_agent: "ClashMeta"
+
+  # 形态 B：通用手动节点 (非订阅的独立自建 VPS，如自建香港/日本直连节点)
+  custom_proxies:
+    - name: "🇯🇵 自建日本直连"
+      type: ss
+      server: 198.51.100.2
+      port: 8388
+      cipher: aes-256-gcm
+      password: "my-ss-password"
+      udp: true
+
+# ------------------------------------------------------------------------------
+# 3. 自定义分流规则扩展 (可选)
+# 默认使用上游全套成熟规则 (OpenAI, Claude, Apple, Telegram, Steam, 国内直连等)。
+# 若需添加自定义规则，按类别填入，自定义规则拥有最高优先级（插入最前端）。
+# ------------------------------------------------------------------------------
+custom_rules:
+  # 直连规则扩展 (Direct)
+  direct:
+    remote_rulesets: []
+      # - "https://raw.githubusercontent.com/.../my_direct.list"
+    rules: []
+      # - "DOMAIN-SUFFIX,company.internal"
+      # - "IP-CIDR,10.0.0.0/8,no-resolve"
+
+  # 中转代理规则扩展 (Relay / 海外服务)
+  relay:
+    remote_rulesets: []
+    rules: []
+      # - "DOMAIN-SUFFIX,custom-blocked-site.com"
+
+  # Claude / 独立海外出口规则扩展 (Claude Exit)
+  claude_exit:
+    remote_rulesets: []
+    rules: []
+      # - "DOMAIN-SUFFIX,my-anthropic-mirror.com"

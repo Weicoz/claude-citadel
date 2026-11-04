@@ -1,0 +1,310 @@
+mixed-port: 7897
+allow-lan: false
+mode: rule
+find-process-mode: strict
+log-level: warning
+ipv6: false
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  endpoint-independent-nat: true
+  route-exclude-address: []
+  dns-hijack:
+  - any:53
+  disable-icmp-forwarding: true
+dns:
+  enable: true
+  listen: 127.0.0.1:7874
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/15
+  fake-ip-filter:
+  - +.kuaishou.com
+  - +.kuaishou.cn
+  - +.gifshow.com
+  - +.ksapisrv.com
+  - +.kwaicdn.com
+  - +.kwimgs.com
+  - +.yximgs.com
+  respect-rules: true
+  default-nameserver:
+  - https://223.5.5.5/dns-query
+  - https://1.12.12.12/dns-query
+  nameserver:
+  - https://dns.google/dns-query
+  - https://cloudflare-dns.com/dns-query
+  direct-nameserver:
+  - https://223.5.5.5/dns-query
+  - https://1.12.12.12/dns-query
+  proxy-server-nameserver:
+  - https://223.5.5.5/dns-query
+  - https://1.12.12.12/dns-query
+  follow-rule: true
+  nameserver-policy:
+    +.163.com:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+    +.netease.com:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+    +.uuremote.com:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+    +.kuaishou.com:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+proxies: []
+proxy-providers: {}
+proxy-groups:
+- name: 🔀 中转节点
+  type: select
+  proxies:
+  - ⚡ 自动择优
+  - 🛟 Fallback
+- name: ⚡ 自动择优
+  type: url-test
+  url: http://www.apple.com/library/test/success.html
+  interval: 300
+  tolerance: 50
+  proxies: []
+- name: 🛟 Fallback
+  type: fallback
+  url: http://www.apple.com/library/test/success.html
+  interval: 300
+  proxies: []
+- name: 🌐 海外服务
+  type: select
+  proxies:
+  - 🔀 中转节点
+  - ⚡ 自动择优
+  - 🇺🇸 海外出口
+  - DIRECT
+- name: 🇺🇸 海外出口
+  type: select
+  proxies: []
+- name: 🤖 OpenAI
+  type: select
+  proxies:
+  - 🇺🇸 海外出口
+  - 🇺🇸 美国节点
+  - 🇯🇵 日本节点
+  - 🇸🇬 新加坡节点
+  - 🔀 中转节点
+- name: 🚀 Google AI
+  type: select
+  proxies:
+  - 🇺🇸 海外出口
+  - 🇺🇸 美国节点
+  - 🇯🇵 日本节点
+  - 🇸🇬 新加坡节点
+  - 🔀 中转节点
+- name: 📧 邮件收件
+  type: select
+  proxies:
+  - DIRECT
+  - 🔀 中转节点
+  - 🌐 海外服务
+- name: ✈️ Telegram
+  type: select
+  proxies:
+  - 🔀 中转节点
+  - 🇸🇬 新加坡节点
+  - 🇭🇰 香港节点
+  - 🇯🇵 日本节点
+- name: 🍎 Apple
+  type: select
+  proxies:
+  - DIRECT
+  - 🔀 中转节点
+  - 🇭🇰 香港节点
+- name: 🎮 Steam
+  type: select
+  proxies:
+  - DIRECT
+  - 🔀 中转节点
+  - 🇭🇰 香港节点
+- name: 🔗 直连改道
+  type: select
+  proxies:
+  - DIRECT
+  - 🔀 中转节点
+  - 🌐 海外服务
+  - 🇺🇸 海外出口
+  - ⚡ 自动择优
+  - 🛟 Fallback
+- name: 🕸️ 组网访问
+  type: select
+  proxies:
+  - DIRECT
+- name: 🇭🇰 香港节点
+  type: select
+  filter: (?i)港|hk|hongkong|hong kong
+  proxies: []
+- name: 🇯🇵 日本节点
+  type: select
+  filter: (?i)日|jp|japan
+  proxies: []
+- name: 🇺🇸 美国节点
+  type: select
+  filter: (?i)美|us|united states
+  proxies: []
+- name: 🇸🇬 新加坡节点
+  type: select
+  filter: (?i)新|sg|singapore
+  proxies: []
+- name: 🇹🇼 台湾节点
+  type: select
+  filter: (?i)台|tw|taiwan
+  proxies: []
+rules:
+- DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
+- DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
+- PROCESS-NAME,claude,🇺🇸 海外出口
+- PROCESS-NAME,Claude,🇺🇸 海外出口
+- PROCESS-NAME,claude.exe,🇺🇸 海外出口
+- PROCESS-NAME,Claude.exe,🇺🇸 海外出口
+- PROCESS-NAME-REGEX,^claude( .*)?$,🇺🇸 海外出口
+- PROCESS-PATH-REGEX,^/Users/[^/]+/\.local/(bin/claude|share/claude/(versions/[^/]+|ClaudeCode\.app/Contents/MacOS/claude))$,🇺🇸
+  海外出口
+- RULE-SET,claude,🇺🇸 海外出口
+- DOMAIN-SUFFIX,local,DIRECT
+- IP-CIDR,0.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+- IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+- IP-CIDR6,::1/128,DIRECT,no-resolve
+- IP-CIDR6,fc00::/7,DIRECT,no-resolve
+- IP-CIDR6,fe80::/10,DIRECT,no-resolve
+- RULE-SET,direct-supplement,DIRECT
+- RULE-SET,proxy-supplement,🇺🇸 海外出口
+- RULE-SET,openai,🤖 OpenAI
+- RULE-SET,google-ai,🚀 Google AI
+- RULE-SET,telegram,✈️ Telegram
+- RULE-SET,apple,🍎 Apple
+- RULE-SET,steam,🎮 Steam
+- RULE-SET,discord,🌐 海外服务
+- RULE-SET,microsoft,🌐 海外服务
+- RULE-SET,mail,📧 邮件收件
+- RULE-SET,gfw,🌐 海外服务
+- RULE-SET,direct,DIRECT
+- RULE-SET,cn-ip,DIRECT
+- GEOIP,CN,DIRECT
+- MATCH,🌐 海外服务
+rule-providers:
+  claude:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/claude.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/claude.yaml
+    interval: 86400
+    proxy: DIRECT
+  direct-supplement:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/direct-supplement.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/public_direct_supplement.yaml
+    interval: 86400
+    proxy: DIRECT
+  proxy-supplement:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/proxy-supplement.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/public_proxy_supplement.yaml
+    interval: 86400
+    proxy: DIRECT
+  openai:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/openai.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    interval: 86400
+    proxy: DIRECT
+  google-ai:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/google-ai.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
+    interval: 86400
+    proxy: DIRECT
+  telegram:
+    type: http
+    behavior: classical
+    format: text
+    path: ./ruleset/telegram.txt
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt
+    interval: 86400
+    proxy: DIRECT
+  apple:
+    type: http
+    behavior: classical
+    format: text
+    path: ./ruleset/apple.txt
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
+    interval: 86400
+    proxy: DIRECT
+  microsoft:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/microsoft.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Microsoft/Microsoft.yaml
+    interval: 86400
+    proxy: DIRECT
+  steam:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/steam.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Steam/Steam.yaml
+    interval: 86400
+    proxy: DIRECT
+  discord:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/discord.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.yaml
+    interval: 86400
+    proxy: DIRECT
+  mail:
+    type: http
+    behavior: classical
+    format: yaml
+    path: ./ruleset/mail.yaml
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Mail/Mail.yaml
+    interval: 86400
+    proxy: DIRECT
+  gfw:
+    type: http
+    behavior: classical
+    format: text
+    path: ./ruleset/gfw.txt
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt
+    interval: 86400
+    proxy: DIRECT
+  direct:
+    type: http
+    behavior: classical
+    format: text
+    path: ./ruleset/direct.txt
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
+    interval: 86400
+    proxy: DIRECT
+  cn-ip:
+    type: http
+    behavior: ipcidr
+    format: text
+    path: ./ruleset/cn-ip.txt
+    url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
+    interval: 86400
+    proxy: DIRECT

@@ -1,0 +1,62 @@
+name: 自动构建与同步订阅
+
+on:
+  schedule:
+    # 每天 UTC 02:00 (北京时间 10:00) 自动检查并更新节点
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '仅执行校验，不发布到 Gist'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install --upgrade pip
+          pip install pyyaml
+
+      - name: 安装 Mihomo 离线语法校验器
+        run: |
+          mkdir -p bin
+          curl -sL https://github.com/MetaCubeX/mihomo/releases/download/v1.19.32/mihomo-linux-amd64-compatible-v1.19.32.gz -o bin/mihomo.gz
+          echo 'ba3ce607747a07f948fc35780e108a4a7c7f552a38b9bd4d115f313ebcb89c20  bin/mihomo.gz' | sha256sum --check
+          gzip -dc bin/mihomo.gz > bin/mihomo
+          chmod +x bin/mihomo
+
+      - name: 运行回归测试
+        run: |
+          python3 -m unittest discover -s tests -v
+
+      - name: 构建并发布到 Secret Gist
+        env:
+          GH_TOKEN: ${{ secrets.GIST_PAT || secrets.GITHUB_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+        run: |
+          if [ -z "$GIST_ID" ]; then
+            echo "::error::未检测到 GIST_ID Secret，请在仓库 Settings -> Secrets 中设置！"
+            exit 1
+          fi
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 build.py --gist-id "$GIST_ID"
+          else
+            python3 build.py --gist-id "$GIST_ID" --publish-gist "$GIST_ID"
+          fi
