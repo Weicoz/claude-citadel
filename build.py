@@ -328,12 +328,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             all_proxies.append(p)
             relay_custom_names.append(p["name"])
 
-    # 处理 DIY 自定义策略组中的独立专属节点 (不参与日常中转测速)
+    # 处理 DIY 自定义策略组中的独立专属节点 (不参与日常中转测速，同名节点自动去重)
     diy_groups = extract_diy_groups(profile_data)
+    seen_proxy_names = {p["name"] for p in all_proxies if isinstance(p, dict) and "name" in p}
     for g_def in diy_groups:
         for p in g_def.get("proxies", []) or []:
-            if isinstance(p, dict) and "name" in p:
+            if isinstance(p, dict) and "name" in p and p["name"] not in seen_proxy_names:
                 all_proxies.append(p)
+                seen_proxy_names.add(p["name"])
 
     config["proxies"] = all_proxies
 
@@ -569,19 +571,29 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         p_type = p.get("type", "ss").lower()
         server = p.get("server", "127.0.0.1")
         port = p.get("port", 8388)
-        relay_names.append(name)
 
+        # 协议兼容性过滤：跳过 INI 类客户端不支持的现代核心专有协议 (如 AnyTLS)
         if client_type in ["surge", "shadowrocket"]:
-            proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
+            if p_type in ["ss", "socks5", "http", "vmess", "trojan", "snell", "wireguard", "hysteria2"]:
+                relay_names.append(name)
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
         elif client_type == "loon":
-            proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
+            if p_type in ["ss", "socks5", "http", "vmess", "trojan", "wireguard", "hysteria2"]:
+                relay_names.append(name)
+                proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
         elif client_type == "qx":
-            proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
+            if p_type in ["ss", "socks5", "http", "vmess", "trojan"]:
+                relay_names.append(name)
+                proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
 
     diy_groups = extract_diy_groups(profile_data)
+    seen_diy_names = set()
     for g_def in diy_groups:
         for p in g_def.get("proxies", []) or []:
             name = p.get("name", "DIY_Proxy")
+            if name in seen_diy_names:
+                continue
+            seen_diy_names.add(name)
             p_type = p.get("type", "socks5").lower()
             server = p.get("server", "127.0.0.1")
             port = p.get("port", 1080)
