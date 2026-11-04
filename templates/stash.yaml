@@ -157,7 +157,7 @@ rules:
 - PROCESS-NAME-REGEX,^claude( .*)?$,🇺🇸 海外出口
 - PROCESS-PATH-REGEX,^/Users/[^/]+/\.local/(bin/claude|share/claude/(versions/[^/]+|ClaudeCode\.app/Contents/MacOS/claude))$,🇺🇸
   海外出口
-- RULE-SET,claude,🇺🇸 海外出口
+- RULE-SET,claude-citadel-claude,🇺🇸 海外出口
 - DOMAIN-SUFFIX,local,DIRECT
 - IP-CIDR,0.0.0.0/8,DIRECT,no-resolve
 - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
@@ -167,131 +167,131 @@ rules:
 - IP-CIDR6,::1/128,DIRECT,no-resolve
 - IP-CIDR6,fc00::/7,DIRECT,no-resolve
 - IP-CIDR6,fe80::/10,DIRECT,no-resolve
-- RULE-SET,direct-supplement,DIRECT
-- RULE-SET,proxy-supplement,🇺🇸 海外出口
-- RULE-SET,openai,🤖 OpenAI
-- RULE-SET,google-ai,🚀 Google AI
-- RULE-SET,telegram,✈️ Telegram
-- RULE-SET,apple,🍎 Apple
-- RULE-SET,steam,🎮 Steam
-- RULE-SET,discord,🌐 海外服务
-- RULE-SET,microsoft,🌐 海外服务
-- RULE-SET,mail,📧 邮件收件
-- RULE-SET,gfw,🌐 海外服务
-- RULE-SET,direct,DIRECT
-- RULE-SET,cn-ip,DIRECT
+- RULE-SET,claude-citadel-direct-supplement,DIRECT
+- RULE-SET,claude-citadel-proxy-supplement,🇺🇸 海外出口
+- RULE-SET,claude-citadel-openai,🤖 OpenAI
+- RULE-SET,claude-citadel-google-ai,🚀 Google AI
+- RULE-SET,claude-citadel-telegram,✈️ Telegram
+- RULE-SET,claude-citadel-apple,🍎 Apple
+- RULE-SET,claude-citadel-steam,🎮 Steam
+- RULE-SET,claude-citadel-discord,🌐 海外服务
+- RULE-SET,claude-citadel-microsoft,🌐 海外服务
+- RULE-SET,claude-citadel-mail,📧 邮件收件
+- RULE-SET,claude-citadel-gfw,🌐 海外服务
+- RULE-SET,claude-citadel-direct,DIRECT
+- RULE-SET,claude-citadel-cn-ip,DIRECT
 - GEOIP,CN,DIRECT
 - MATCH,🌐 海外服务
 rule-providers:
-  claude:
+  claude-citadel-claude:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/claude.yaml
+    path: ./ruleset/claude-citadel-claude.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/claude.yaml
     interval: 86400
     proxy: DIRECT
-  direct-supplement:
+  claude-citadel-direct-supplement:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/direct-supplement.yaml
+    path: ./ruleset/claude-citadel-direct-supplement.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_direct_supplement.yaml
     interval: 86400
     proxy: DIRECT
-  proxy-supplement:
+  claude-citadel-proxy-supplement:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/proxy-supplement.yaml
+    path: ./ruleset/claude-citadel-proxy-supplement.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_proxy_supplement.yaml
     interval: 86400
     proxy: DIRECT
-  openai:
+  claude-citadel-openai:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/openai.yaml
+    path: ./ruleset/claude-citadel-openai.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
     interval: 86400
     proxy: DIRECT
-  google-ai:
+  claude-citadel-google-ai:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/google-ai.yaml
+    path: ./ruleset/claude-citadel-google-ai.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
     interval: 86400
     proxy: DIRECT
-  telegram:
+  claude-citadel-telegram:
     type: http
     behavior: classical
     format: text
-    path: ./ruleset/telegram.txt
+    path: ./ruleset/claude-citadel-telegram.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt
     interval: 86400
     proxy: DIRECT
-  apple:
+  claude-citadel-apple:
     type: http
     behavior: classical
     format: text
-    path: ./ruleset/apple.txt
+    path: ./ruleset/claude-citadel-apple.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
     interval: 86400
     proxy: DIRECT
-  microsoft:
+  claude-citadel-microsoft:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/microsoft.yaml
+    path: ./ruleset/claude-citadel-microsoft.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Microsoft/Microsoft.yaml
     interval: 86400
     proxy: DIRECT
-  steam:
+  claude-citadel-steam:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/steam.yaml
+    path: ./ruleset/claude-citadel-steam.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Steam/Steam.yaml
     interval: 86400
     proxy: DIRECT
-  discord:
+  claude-citadel-discord:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/discord.yaml
+    path: ./ruleset/claude-citadel-discord.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.yaml
     interval: 86400
     proxy: DIRECT
-  mail:
+  claude-citadel-mail:
     type: http
     behavior: classical
     format: yaml
-    path: ./ruleset/mail.yaml
+    path: ./ruleset/claude-citadel-mail.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Mail/Mail.yaml
     interval: 86400
     proxy: DIRECT
-  gfw:
+  claude-citadel-gfw:
     type: http
     behavior: classical
     format: text
-    path: ./ruleset/gfw.txt
+    path: ./ruleset/claude-citadel-gfw.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt
     interval: 86400
     proxy: DIRECT
-  direct:
+  claude-citadel-direct:
     type: http
     behavior: classical
     format: text
-    path: ./ruleset/direct.txt
+    path: ./ruleset/claude-citadel-direct.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
     interval: 86400
     proxy: DIRECT
-  cn-ip:
+  claude-citadel-cn-ip:
     type: http
     behavior: ipcidr
     format: text
-    path: ./ruleset/cn-ip.txt
+    path: ./ruleset/claude-citadel-cn-ip.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
     interval: 86400
     proxy: DIRECT

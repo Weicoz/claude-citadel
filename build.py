@@ -183,9 +183,26 @@ def format_qx_rule(raw_rule, default_target):
         target = "reject"
     return f"{qx_type}, {pattern}, {target}"
 
-def apply_custom_rules_clash(config, custom_rules):
+def extract_diy_groups(profile_data):
+    """提取用户自定义 DIY 策略组、独立节点与专属规则。"""
+    diy_groups = profile_data.get("diy_groups", []) or []
+    # 兼容回退：若旧字段 mesh_proxies 或 custom_rules.mesh 存在，自动转为 DIY 组
+    if not diy_groups and (profile_data.get("mesh_proxies") or (profile_data.get("custom_rules", {}) or {}).get("mesh")):
+        mesh_nodes = profile_data.get("mesh_proxies", []) or []
+        mesh_rules_cfg = (profile_data.get("custom_rules", {}) or {}).get("mesh", {}) or {}
+        diy_groups.append({
+            "name": "🕸️ 组网访问",
+            "type": "select",
+            "proxies": mesh_nodes,
+            "rules": mesh_rules_cfg.get("rules", []),
+            "remote_rulesets": mesh_rules_cfg.get("remote_rulesets", [])
+        })
+    return diy_groups
+
+
+def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
     """注入用户自定义分流规则到 Clash / Stash。"""
-    if not custom_rules:
+    if not custom_rules and not diy_groups:
         return config
 
     rules = config.get("rules", [])
@@ -195,7 +212,7 @@ def apply_custom_rules_clash(config, custom_rules):
     # 1. 注入 Claude 专属自定义规则
     claude_cfg = custom_rules.get("claude_exit", {}) or {}
     for idx, r_url in enumerate(claude_cfg.get("remote_rulesets", []) or []):
-        tag = f"custom-claude-{idx+1}"
+        tag = f"claude-citadel-custom-claude-{idx+1}"
         rule_providers[tag] = {
             "type": "http",
             "behavior": "classical",
@@ -214,7 +231,7 @@ def apply_custom_rules_clash(config, custom_rules):
     # 2. 注入直连自定义规则
     direct_cfg = custom_rules.get("direct", {}) or {}
     for idx, r_url in enumerate(direct_cfg.get("remote_rulesets", []) or []):
-        tag = f"custom-direct-{idx+1}"
+        tag = f"claude-citadel-custom-direct-{idx+1}"
         rule_providers[tag] = {
             "type": "http",
             "behavior": "classical",
@@ -233,7 +250,7 @@ def apply_custom_rules_clash(config, custom_rules):
     # 3. 注入中转自定义规则
     relay_cfg = custom_rules.get("relay", {}) or {}
     for idx, r_url in enumerate(relay_cfg.get("remote_rulesets", []) or []):
-        tag = f"custom-relay-{idx+1}"
+        tag = f"claude-citadel-custom-relay-{idx+1}"
         rule_providers[tag] = {
             "type": "http",
             "behavior": "classical",
@@ -249,24 +266,28 @@ def apply_custom_rules_clash(config, custom_rules):
         if formatted:
             injected_rules.append(formatted)
 
-    # 4. 注入组网自定义规则 (Mesh / 组网访问，如 EasyTier / Tailscale)
-    mesh_cfg = custom_rules.get("mesh", {}) or {}
-    for idx, r_url in enumerate(mesh_cfg.get("remote_rulesets", []) or []):
-        tag = f"custom-mesh-{idx+1}"
-        rule_providers[tag] = {
-            "type": "http",
-            "behavior": "classical",
-            "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
-            "path": f"./ruleset/{tag}.yaml",
-            "url": r_url,
-            "interval": 86400,
-            "proxy": "DIRECT"
-        }
-        injected_rules.append(f"RULE-SET,{tag},🕸️ 组网访问")
-    for r in mesh_cfg.get("rules", []) or []:
-        formatted = format_clash_stash_rule(r, "🕸️ 组网访问")
-        if formatted:
-            injected_rules.append(formatted)
+    # 4. 注入 DIY 自定义策略组分流规则
+    for g_idx, g_def in enumerate(diy_groups or []):
+        g_name = g_def.get("name")
+        if not g_name:
+            continue
+        tag_prefix = sanitize_id(g_name) or f"diy_{g_idx+1}"
+        for idx, r_url in enumerate(g_def.get("remote_rulesets", []) or []):
+            tag = f"claude-citadel-diy-{tag_prefix}-{idx+1}"
+            rule_providers[tag] = {
+                "type": "http",
+                "behavior": "classical",
+                "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
+                "path": f"./ruleset/{tag}.yaml",
+                "url": r_url,
+                "interval": 86400,
+                "proxy": "DIRECT"
+            }
+            injected_rules.append(f"RULE-SET,{tag},{g_name}")
+        for r in g_def.get("rules", []) or []:
+            formatted = format_clash_stash_rule(r, g_name)
+            if formatted:
+                injected_rules.append(formatted)
 
     config["rules"] = injected_rules + rules
     config["rule-providers"] = rule_providers
@@ -307,13 +328,12 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             all_proxies.append(p)
             relay_custom_names.append(p["name"])
 
-    # 处理独立组网节点 (如 EasyTier / Tailscale，不参与日常中转测速)
-    mesh_custom = profile_data.get("mesh_proxies", []) or []
-    mesh_custom_names = []
-    for p in mesh_custom:
-        if isinstance(p, dict) and "name" in p:
-            all_proxies.append(p)
-            mesh_custom_names.append(p["name"])
+    # 处理 DIY 自定义策略组中的独立专属节点 (不参与日常中转测速)
+    diy_groups = extract_diy_groups(profile_data)
+    for g_def in diy_groups:
+        for p in g_def.get("proxies", []) or []:
+            if isinstance(p, dict) and "name" in p:
+                all_proxies.append(p)
 
     config["proxies"] = all_proxies
 
@@ -473,20 +493,26 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         else:
             new_groups.append(g)
 
-    # 动态插入「🕸️ 组网访问」：仅当用户配置了 mesh_proxies 或 custom_rules.mesh 时启用
-    has_mesh = bool(mesh_custom_names or (custom_rules.get("mesh", {}) or {}).get("rules") or (custom_rules.get("mesh", {}) or {}).get("remote_rulesets"))
-    if has_mesh:
-        mesh_group = {
-            "name": "🕸️ 组网访问",
-            "type": "select",
-            "proxies": ["DIRECT"] + mesh_custom_names if mesh_custom_names else ["DIRECT"]
-        }
+    # 动态插入 DIY 自定义策略组：完全由用户自主定义组名、独立节点与专属规则
+    if diy_groups:
         insert_idx = len(new_groups)
         for idx, g in enumerate(new_groups):
             if g.get("name") == "🔗 直连改道":
                 insert_idx = idx + 1
                 break
-        new_groups.insert(insert_idx, mesh_group)
+        for g_def in diy_groups:
+            g_name = g_def.get("name")
+            if not g_name:
+                continue
+            g_type = g_def.get("type", "select")
+            g_nodes = [p["name"] for p in g_def.get("proxies", []) if isinstance(p, dict) and "name" in p]
+            proxies_list = ["DIRECT"] + g_nodes if g_nodes else ["DIRECT"]
+            new_groups.insert(insert_idx, {
+                "name": g_name,
+                "type": g_type,
+                "proxies": proxies_list
+            })
+            insert_idx += 1
 
     # 保证每个策略组都合法，无空 use 或空 proxies 导致内核崩溃
     for g in new_groups:
@@ -498,7 +524,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             g["proxies"] = ["DIRECT"]
 
     config["proxy-groups"] = new_groups
-    return apply_custom_rules_clash(config, custom_rules)
+    return apply_custom_rules_clash(config, custom_rules, diy_groups)
 
 
 def build_ini_based_client(template_path, profile_data, client_type="surge"):
@@ -552,21 +578,19 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         elif client_type == "qx":
             proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
 
-    mesh_custom = profile_data.get("mesh_proxies", []) or []
-    mesh_names = []
-    for p in mesh_custom:
-        name = p.get("name", "Mesh_Proxy")
-        p_type = p.get("type", "socks5").lower()
-        server = p.get("server", "127.0.0.1")
-        port = p.get("port", 15555)
-        mesh_names.append(name)
-
-        if client_type in ["surge", "shadowrocket"]:
-            proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
-        elif client_type == "loon":
-            proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
-        elif client_type == "qx":
-            proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
+    diy_groups = extract_diy_groups(profile_data)
+    for g_def in diy_groups:
+        for p in g_def.get("proxies", []) or []:
+            name = p.get("name", "DIY_Proxy")
+            p_type = p.get("type", "socks5").lower()
+            server = p.get("server", "127.0.0.1")
+            port = p.get("port", 1080)
+            if client_type in ["surge", "shadowrocket"]:
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
+            elif client_type == "loon":
+                proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
+            elif client_type == "qx":
+                proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
 
     # 2. 插入节点
     if client_type in ["surge", "shadowrocket", "loon"]:
@@ -623,16 +647,21 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         content = content.replace("🇺🇸 海外出口 = select,DIRECT", f"🇺🇸 海外出口 = select,{target_line}")
         content = content.replace("static=🇺🇸 海外出口, direct", f"static=🇺🇸 海外出口, {target_line}")
 
-    # 动态插入「🕸️ 组网访问」：仅当用户配置了 mesh_proxies 或 custom_rules.mesh 时启用
-    has_mesh = bool(mesh_names or (custom_rules.get("mesh", {}) or {}).get("rules") or (custom_rules.get("mesh", {}) or {}).get("remote_rulesets"))
-    if has_mesh:
-        if client_type in ["surge", "shadowrocket", "loon"]:
-            mesh_target = ", ".join(["DIRECT"] + mesh_names)
-            content = content.replace("🔗 直连改道", f"🕸️ 组网访问 = select, {mesh_target}\n🔗 直连改道")
-        elif client_type == "qx":
-            mesh_target = ", ".join(["direct"] + mesh_names)
-            qx_mesh_line = f"static=🕸️ 组网访问, {mesh_target}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"
-            content = content.replace("static=🔗 直连改道", f"{qx_mesh_line}\nstatic=🔗 直连改道")
+    # 动态插入 DIY 自定义策略组：完全由用户自主定义组名、独立节点与专属规则
+    if diy_groups:
+        for g_def in diy_groups:
+            g_name = g_def.get("name")
+            if not g_name:
+                continue
+            g_nodes = [p["name"] for p in g_def.get("proxies", []) if isinstance(p, dict) and "name" in p]
+            if client_type in ["surge", "shadowrocket", "loon"]:
+                target_str = ", ".join(["DIRECT"] + g_nodes)
+                diy_line = f"{g_name} = select, {target_str}"
+                content = content.replace("🔗 直连改道", f"{diy_line}\n🔗 直连改道")
+            elif client_type == "qx":
+                target_str = ", ".join(["direct"] + g_nodes)
+                diy_line = f"static={g_name}, {target_str}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"
+                content = content.replace("static=🔗 直连改道", f"{diy_line}\nstatic=🔗 直连改道")
 
     # 5. 注入自定义分流规则 (Direct / Relay / Claude Exit)
     injected_rules = []
@@ -644,56 +673,65 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
                 return format_ini_rule(r_text, default_tgt)
 
         # Claude Exit
-        for r_url in (custom_rules.get("claude_exit", {}) or {}).get("remote_rulesets", []) or []:
+        for idx, r_url in enumerate((custom_rules.get("claude_exit", {}) or {}).get("remote_rulesets", []) or []):
+            tag = f"claude-citadel-custom-claude-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🇺🇸 海外出口,tag=custom-claude,enabled=true\n")
+                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🇺🇸 海外出口,tag={tag},enabled=true\n")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},🇺🇸 海外出口")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-claude, force-remote-spec=true\n")
+                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
         for r in (custom_rules.get("claude_exit", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "🇺🇸 海外出口")
             if fmt:
                 injected_rules.append(fmt)
 
         # Direct
-        for r_url in (custom_rules.get("direct", {}) or {}).get("remote_rulesets", []) or []:
+        for idx, r_url in enumerate((custom_rules.get("direct", {}) or {}).get("remote_rulesets", []) or []):
+            tag = f"claude-citadel-custom-direct-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=DIRECT,tag=custom-direct,enabled=true\n")
+                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=DIRECT,tag={tag},enabled=true\n")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},DIRECT")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-direct, force-remote-spec=true\n")
+                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
         for r in (custom_rules.get("direct", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "DIRECT")
             if fmt:
                 injected_rules.append(fmt)
 
         # Relay
-        for r_url in (custom_rules.get("relay", {}) or {}).get("remote_rulesets", []) or []:
+        for idx, r_url in enumerate((custom_rules.get("relay", {}) or {}).get("remote_rulesets", []) or []):
+            tag = f"claude-citadel-custom-relay-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🔀 中转节点,tag=custom-relay,enabled=true\n")
+                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🔀 中转节点,tag={tag},enabled=true\n")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},🔀 中转节点")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-relay, force-remote-spec=true\n")
+                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
         for r in (custom_rules.get("relay", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "🔀 中转节点")
             if fmt:
                 injected_rules.append(fmt)
 
-        # Mesh / 组网访问 (EasyTier / Tailscale)
-        for r_url in (custom_rules.get("mesh", {}) or {}).get("remote_rulesets", []) or []:
-            if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🕸️ 组网访问,tag=custom-mesh,enabled=true\n")
-            elif client_type in ["surge", "shadowrocket"]:
-                injected_rules.append(f"RULE-SET,{r_url},🕸️ 组网访问")
-            elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-mesh, force-remote-spec=true\n")
-        for r in (custom_rules.get("mesh", {}) or {}).get("rules", []) or []:
-            fmt = format_rule_for_client(r, "🕸️ 组网访问")
-            if fmt:
-                injected_rules.append(fmt)
+        # DIY 规则与远端规则集 (支持自定义任何策略组、任意节点与分流)
+        for g_idx, g_def in enumerate(diy_groups or []):
+            g_name = g_def.get("name")
+            if not g_name:
+                continue
+            tag_prefix = sanitize_id(g_name) or f"diy_{g_idx+1}"
+            for idx, r_url in enumerate(g_def.get("remote_rulesets", []) or []):
+                tag = f"claude-citadel-diy-{tag_prefix}-{idx+1}"
+                if client_type == "loon":
+                    content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy={g_name},tag={tag},enabled=true\n")
+                elif client_type in ["surge", "shadowrocket"]:
+                    injected_rules.append(f"RULE-SET,{r_url},{g_name}")
+                elif client_type == "qx":
+                    content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
+            for r in g_def.get("rules", []) or []:
+                fmt = format_rule_for_client(r, g_name)
+                if fmt:
+                    injected_rules.append(fmt)
 
     if injected_rules:
         rule_block = "\n".join(injected_rules) + "\n"

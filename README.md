@@ -2,28 +2,31 @@
 
 > 🚀 **全平台全协议多机场与 Claude 独立出口自动化同步系统**
 >
-> 节点与规则深度解耦：自主管理 1~4 家机场及 Claude 独立出口，全自动继承上游最新的精准分流规则，一键编译并发布至单个 Secret Gist，全平台免密秒级消费。
+> 节点与规则深度解耦：自主管理 1~4 家机场、Claude 独立出口与 DIY 专属通道，全自动继承权威上游规则，一键编译并发布至私有 Secret Gist，全平台免密秒级消费。
 
 ---
 
 ## ✨ 核心特性
 
 - **6 大主流客户端全适配**：
-  - **Clash / Mihomo** (`clash.yaml`) - 桌面端与 Android 标配
-  - **Stash** (`stash.yaml`) - iOS / macOS 平台规则优化版
-  - **Surge** (`surge.conf`) - iOS / macOS 专业级规则与 Underlying-Proxy 链式代理
-  - **Loon** (`loon.conf`) - iOS 现代轻量级代理与 Remote Rule
-  - **Shadowrocket** (`shadowrocket.conf`) - iOS 小火箭一键订阅
-  - **Quantumult X** (`qx.conf`) - iOS 经典神机代理与 Filter Remote
-- **Claude 出口物理隔离与代理链控制**：
-  - Claude / Anthropic 专用节点（波特兰 VPS、独立住宅 IP、专线订阅）物理隔离于常规中转池。
-  - 支持 **`use_relay_chain: true / false`** 全局开关及单节点自主覆盖（经由中转链式前置拨号 vs 直接直连拨号）。
-- **三层分流规则自由定制**：
-  - 默认继承上游全部成熟分流（OpenAI、Claude、Apple、Telegram、Steam、国内外 AI、邮件、直连等）。
-  - 支持在 `profile.yaml` 中追加 **直连 (Direct)**、**中转 (Relay)**、**海外出口 (Claude Exit)** 自定义规则，支持远端规则集 URL 或本地单条规则，优先置顶匹配。
-- **1~4+ 家多机场与自建节点混部**：自动按机场前缀防重名，并自动组装「单机场择优组」、「跨机场全局择优组」、「故障转移 Fallback 组」与「区域聚合组（港/日/美/新/台）」。
-- **单 Gist 双向闭环**：输入（`profile.yaml`）与全端输出汇聚在同一个 GitHub Secret Gist。手机浏览器即可改节点，零 Git 冲突风险。
-- **离线内核校验与熔断保护**：集成 `mihomo -t` 内核离线语法检验。格式写错时自动熔断并保留旧配置，绝不污染云端 Gist，网络绝不断网。
+  - **Clash / Mihomo** (`clash.yaml`) - 桌面端与 Android 标配，支持 Meta 增强特性与 MRS 格式
+  - **Stash** (`stash.yaml`) - iOS / macOS 平台规则优化版，双重兼容 header 格式
+  - **Surge** (`surge.conf`) - iOS / macOS 专业级规则、`underlying-proxy` 链式代理与 `policy-path`
+  - **Loon** (`loon.conf`) - iOS 现代轻量级代理，原生 `[Proxy Chain]` 链式代理
+  - **Shadowrocket** (`shadowrocket.conf`) - iOS 小火箭一键订阅，原生 `chain=中转节点`
+  - **Quantumult X** (`qx.conf`) - iOS 经典神机代理，Filter Remote 与小写规则自动转译
+- **Claude 独立出口物理隔离与代理链控制**：
+  - Claude / Anthropic 专用节点（原生住宅 IP、自建 VPS、专线）物理隔离于常规中转池，日常流量与测速绝不经过 Claude 节点。
+  - 支持 **`use_relay_chain: true / false`** 开关（经由中转链式前置拨号 vs 直接直连拨号）。
+- **DIY 自定义策略组与专属通道**：
+  - 彻底摆脱固定标签限制，支持自由 DIY 任意策略组（如 `🏢 公司专网`、`🕸️ 私有组网`、`🎮 游戏专线`）。
+  - DIY 策略组挂载的独立节点**绝不混入机场测速池**；不配置 DIY 时客户端配置完全干净，零多余分组。
+- **项目专属规则标识 (`claude-citadel-`)**：
+  - 模板层生成的所有规则集与分流提供者均带有 `claude-citadel-` 专属前缀，品牌与路由归属清晰明确。
+- **单 Gist 双向闭环**：
+  - 输入（`profile.yaml`）与 6 端输出汇聚在同一个 GitHub Secret Gist。手机网页即可调整节点与规则。
+- **离线内核校验与熔断保护**：
+  - 集成 `mihomo -t` 内核离线语法检验。格式写错时自动熔断并保留旧配置，绝不污染云端 Gist，网络绝不断网。
 
 ---
 
@@ -32,7 +35,7 @@
 ```mermaid
 flowchart TD
     subgraph GIST ["个人私有 Secret Gist"]
-        IN["📄 profile.yaml (机场订阅 + 独立出口 + 自定义规则)"]
+        IN["📄 profile.yaml (机场订阅 + 独立出口 + DIY 规则)"]
         OUT1["⚙️ clash.yaml (Clash / Mihomo)"]
         OUT2["⚙️ stash.yaml (Stash)"]
         OUT3["⚙️ surge.conf (Surge)"]
@@ -62,40 +65,48 @@ flowchart TD
 
 ---
 
-## 🚀 朋友快速上手指南 (3 分钟)
+## 一、整个配置怎么配
 
-### 第一步：创建你的私有仓库
-1. 点击本仓库右上角的 **Use this template**（使用此模板）-> **Create a new repository**。
-2. 仓库可见性**必须选择 Private（私有）**。
+系统的一切配置均收敛在单一配置文件 **`profile.yaml`** 中（位于你的私有 GitHub Secret Gist）。结构分为四大模块：
 
-### 第二步：创建你的配置 Gist
-1. 访问 [GitHub Gist](https://gist.github.com/)，新建一个 **Secret Gist**。
-2. 文件名填 `profile.yaml`。
-3. 参考以下格式填写（参考仓库内 `profile.example.yaml`）：
-
+### 1. Claude 专用出口 (`claude_exits`)
+为 Claude 分配专用出口，日常流量绝不流经此处：
 ```yaml
-# 1. Claude 专用出口
 claude_exits:
-  # 是否强制经由中转池代理链前置拨号 (住宅 IP 直连不通时设为 true；原生直连设为 false)
+  # 代理链开关：
+  # - true: 住宅 IP 国内直连受阻时，流量先经过机场中转节点，再由中转节点发往该出口（规避阻断）
+  # - false: 直接直连拨号（适合低延迟专线或原生可直连 VPS）
   use_relay_chain: true
+
+  # 手动独立节点 (支持 socks5, http, ss, trojan, vmess 等所有协议)
   custom_proxies:
-    - name: "🇺🇸 专属出口 (支持自建 VPS / 原生住宅 IP / 任意地区)"
+    - name: "🇺🇸 专属出口 (SOCKS5)"
       type: socks5
       server: 198.51.100.1
       port: 1080
+    - name: "🇺🇸 专属出口 (HTTP)"
+      type: http
+      server: 198.51.100.1
+      port: 8080
 
-# 2. 通用中转节点 (日常上网、OpenAI、Steam 等)
+  # 专属订阅 (若拥有专门解锁 Claude 的专线机场订阅)
+  subscriptions: []
+```
+
+### 2. 通用中转池 (`relays`)
+用于日常网页浏览、OpenAI、Steam、Google、Telegram 等公网流量：
+```yaml
 relays:
-  # 支持 1 到 4 家或更多机场
+  # 支持接入 1~4 家或更多机场订阅，系统自动聚合
   subscriptions:
     - name: "猫咪云"
       emoji: "🐱"
-      url: "https://你的机场订阅链接1"
+      url: "https://sub.airport1.com/api/v1/client/subscribe?token=xxx"
     - name: "良心专线"
       emoji: "❤️"
-      url: "https://你的机场订阅链接2"
+      url: "https://sub.airport2.com/api/v1/client/subscribe?token=yyy"
 
-  # 支持补充手动自建节点
+  # 手动直连中转节点 (如自建香港/日本直连 VPS)
   custom_proxies:
     - name: "🇯🇵 自建日本直连"
       type: ss
@@ -103,47 +114,156 @@ relays:
       port: 8388
       cipher: aes-256-gcm
       password: "password123"
+```
 
-# 3. 自定义分流规则扩展 (可选)
+### 3. DIY 自定义策略组与专属通道 (`diy_groups`)
+任意自定义业务策略组。挂载的独立节点**不会混入机场测速池**，且绑定的分流规则享有最高优先级：
+```yaml
+diy_groups:
+  # 示例 A：公司专网直连与网段分流
+  - name: "🏢 公司专网"
+    type: select
+    proxies: [] # 走本地 DIRECT 或自建网关
+    rules:
+      - "IP-CIDR,192.168.10.0/24,no-resolve"
+      - "DOMAIN-SUFFIX,company.internal"
+
+  # 示例 B：私有虚拟组网 (EasyTier / Tailscale / WireGuard)
+  - name: "🕸️ 私有组网"
+    type: select
+    proxies:
+      - name: "EasyTier SOCKS5"
+        type: socks5
+        server: 127.0.0.1
+        port: 15555
+    rules:
+      - "IP-CIDR,10.200.0.0/16,no-resolve"
+      - "IP-CIDR,10.201.0.0/16,no-resolve"
+      - "PROCESS-NAME,easytier-core"
+```
+
+### 4. 自定义分流规则扩展 (`custom_rules`)
+置顶注入特定业务规则：
+```yaml
 custom_rules:
+  # 直连放行 (Direct)
   direct:
     rules:
-      - "DOMAIN-SUFFIX,mycompany.internal"
+      - "DOMAIN-SUFFIX,example.com"
+      - "DOMAIN-SUFFIX,nas.local"
+      - "PROCESS-NAME,custom-app"
+
+  # 强制走海外中转 (Relay)
   relay:
     rules:
       - "DOMAIN-SUFFIX,custom-blocked-site.com"
+
+  # 强制走 Claude 出口 (Claude Exit)
   claude_exit:
     rules:
-      - "DOMAIN-SUFFIX,my-claude-mirror.com"
+      - "DOMAIN-SUFFIX,my-anthropic-mirror.com"
 ```
-4. 点击 **Create secret gist**，记录浏览器地址栏中 URL 最后一串字符，这就是你的 `GIST_ID`。
-
-### 第三步：在仓库绑定密钥
-1. 生成具有 `gist` 权限的 [GitHub Personal Access Token (PAT)](https://github.com/settings/tokens)。
-2. 进入你刚刚创建的 GitHub 仓库 -> **Settings** -> **Secrets and variables** -> **Actions**。
-3. 添加以下两个 Repository Secret：
-   - `GIST_ID`：你的 Secret Gist ID。
-   - `GIST_PAT`：你刚才生成的 GitHub Token。
-
-### 第四步：触发构建与导入订阅
-1. 进入仓库的 **Actions** 标签页，选择 **自动构建与同步订阅** -> 点击 **Run workflow**。
-2. 构建成功后，刷新你的 Gist 页面，会发现自动生成了全套 6 大客户端配置文件！
-3. 分别点击对应文件的 `Raw` 按钮，复制 URL 导入客户端即可：
-   - **Clash / Mihomo**：`.../raw/clash.yaml`
-   - **Stash**：`.../raw/stash.yaml`
-   - **Surge**：`.../raw/surge.conf`
-   - **Loon**：`.../raw/loon.conf`
-   - **Shadowrocket**：`.../raw/shadowrocket.conf`
-   - **Quantumult X**：`.../raw/qx.conf`
 
 ---
 
-## 🛠️ 本地开发与测试
+## 二、效果是怎么样（分流拓扑与实际效果）
+
+配置编译后，各客户端的实际流量走向呈现**确定性分流**：
+
+| 流量类别 | 命中特征 | 路由策略组 | 默认行为与说明 |
+| :--- | :--- | :--- | :--- |
+| **Claude / Anthropic** | `claude.ai`、`anthropic.com`、桌面 Claude 进程 | `🇺🇸 海外出口` | 严格经由专用出口发出。若开启代理链，先由机场中转跳板连接出口，防止握手封锁。 |
+| **OpenAI / ChatGPT** | `openai.com`、`chatgpt.com`、API 域名 | `🤖 OpenAI` | 默认优先走 `🇺🇸 海外出口`，亦可手工切换为日/美/新/港节点或全局中转。 |
+| **Google AI** | `gemini.google.com`、`generativelanguage.googleapis.com` | `🚀 Google AI` | 默认优先走 `🇺🇸 海外出口` 或中转池。 |
+| **Apple 服务** | Apple 官方规则库、App Store、iCloud | `🍎 Apple` | 默认直连 `DIRECT`，可切 `🇭🇰 香港`、`🇯🇵 日本`、`🇺🇸 美国`、`🇸🇬 新加坡`、`🇹🇼 台湾`。 |
+| **Steam 游戏** | Steam 官方规则库、商店、CDN | `🎮 Steam` | 默认直连 `DIRECT`，下载不耗代理流量；可自由切换至日本/香港等低延迟节点。 |
+| **Telegram / 邮件** | Telegram 精确 CIDR、常见海外邮箱服务 | `✈️ Telegram` / `📧 邮件收件` | 自动择优中转出口。 |
+| **DIY 专属服务** | 公司内网 `192.168.10.0/24`、EasyTier `10.200.0.0/16` | `🏢 公司专网` / `🕸️ 私有组网` | 精确匹配对应独立节点或直连通道，日常公网测速不经过此通道。 |
+| **国内直连白名单** | 常见国内网站、Oracle Cloud、国内主流 AI (Kimi/DeepSeek/通义) | `DIRECT` | 本地高速直连，不绕行海外代理。 |
+| **通用海外网站** | GFWList、国外媒体、未列入特定规则的海外请求 | `🌐 海外服务` | 经由 `🔀 中转节点` 自动择优。 |
+
+---
+
+## 三、怎么拿这个链接（订阅生成与获取）
+
+配置和生成后的 6 大客户端配置文件全部存放在你的 **GitHub Secret Gist** 中。
+
+### 第一步：创建你的私有配置 Gist
+1. 打开 [GitHub Gist](https://gist.github.com/)，点击新建。
+2. 页面右下角确保选择 **Create secret gist**（创建私有 Gist，防止凭据外泄）。
+3. 文件名输入 `profile.yaml`，内容参考上方说明填写。
+4. 创建后，记录浏览器地址栏中 URL 最后一串 32 位的哈希字符串，此即你的 **`GIST_ID`**。
+
+### 第二步：在仓库中配置自动编译密钥
+1. 访问你的 GitHub 仓库（若使用模板创建，请确保选择 **Private** 私有仓库）。
+2. 进入 **Settings** -> **Secrets and variables** -> **Actions**。
+3. 添加两个密钥：
+   - `GIST_ID`：第一步获取的 Gist ID。
+   - `GIST_PAT`：具有 `gist` 读写权限的 [GitHub Personal Access Token](https://github.com/settings/tokens)。
+
+### 第三步：触发编译与获取 Raw 链接
+1. 进入仓库的 **Actions** 页面，选择 **自动构建与同步订阅** -> 点击 **Run workflow**。
+2. 编译成功后，刷新你的 Gist 页面，会看到仓库自动回写了全套 6 大客户端配置文件：
+   - `clash.yaml`
+   - `stash.yaml`
+   - `surge.conf`
+   - `loon.conf`
+   - `shadowrocket.conf`
+   - `qx.conf`
+3. 点击对应文件右上角的 **Raw** 按钮，浏览器地址栏中的链接即为最终订阅链接，格式为：
+   ```text
+   https://gist.githubusercontent.com/<你的用户名>/<你的GIST_ID>/raw/<文件名>
+   ```
+
+---
+
+## 四、最终用户怎么去使用（6 大客户端导入步骤）
+
+获得上述 Raw 链接后，直接在对应客户端导入即可：
+
+### 1. Clash / Mihomo (Clash Verge / Mihomo Party / Flclash)
+1. 复制 `.../raw/clash.yaml`。
+2. 打开客户端 -> 进入 **订阅/配置 (Profiles)** -> 粘贴链接并点击 **导入/下载**。
+3. 规则模式选择 **Rule (规则模式)**。
+
+### 2. Stash (iOS / macOS)
+1. 复制 `.../raw/stash.yaml`。
+2. 打开 Stash -> 进入 **配置列表** -> 点击 **从 URL 下载** -> 粘贴链接并下载。
+3. 勾选使用该配置。
+
+### 3. Surge (iOS / macOS)
+1. 复制 `.../raw/surge.conf`。
+2. 打开 Surge -> 进入 **配置 (Profiles)** -> 选择 **从 URL 安装配置 (Install Profile from URL)**。
+3. 粘贴链接并确认生效。
+
+### 4. Loon (iOS)
+1. 复制 `.../raw/loon.conf`。
+2. 打开 Loon -> 进入 **配置 (Configuration)** -> 点击右上角新建/下载远程配置。
+3. 粘贴链接更新并加载配置。
+
+### 5. Shadowrocket 小火箭 (iOS)
+1. 复制 `.../raw/shadowrocket.conf`。
+2. 打开小火箭 -> 点击右上角 `+` -> 类型选择 **Subscribe (订阅)**。
+3. 粘贴链接，保存后点击更新节点与分流。
+
+### 6. Quantumult X (iOS)
+1. 复制 `.../raw/qx.conf`。
+2. 打开 Quantumult X -> 进入右下角风车设置 -> 选择 **下载配置文件**。
+3. 粘贴链接覆盖加载。
+
+---
+
+## 🛠️ 本地开发、调试与 Skill 同步
+
+除了云端 GitHub Actions 自动编译外，也可以在本地一键编译：
 
 ```sh
-# 1. 运行本地全平台回归测试
+# 1. 运行本地回归测试套件 (包含 6 项结构与内核离线校验)
 python3 -m unittest discover -s tests -v
 
-# 2. 本地测试构建全部 6 端输出
+# 2. 本地渲染并输出到 output/
 python3 build.py --profile profile.example.yaml
+
+# 3. 使用专属 Skill (终端免密无凭据回显)
+/weicoz-claude-citadel
 ```
