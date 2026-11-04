@@ -70,10 +70,12 @@ diy_groups: []
   #       type: socks5
   #       server: 192.168.10.1
   #       port: 1080
-  #   rules: # 专属置顶分流规则
+  #   rules: # 专属置顶分流规则 (本地行规则)
   #     - "IP-CIDR,192.168.10.0/24,no-resolve"
   #     - "DOMAIN-SUFFIX,company.internal"
-  #   remote_rulesets: []
+  #   remote_rulesets: # 专属远端规则集（支持第三方规则库或个人 Gist 地址）
+  #     # - "https://raw.githubusercontent.com/username/repo/main/company_rules.yaml"
+  #     # - "https://gist.githubusercontent.com/username/gist_id/raw/my_work_rule.yml"
   #
   # - name: "🕸️ 私有组网" # 第二个 DIY 分组示例 (如 EasyTier 组网)
   #   type: select
@@ -83,33 +85,45 @@ diy_groups: []
   #       server: 127.0.0.1
   #       port: 15555
   #   rules:
+  #     - "IP-CIDR,10.155.155.0/24,no-resolve"
   #     - "IP-CIDR,10.200.0.0/16,no-resolve"
-  #     - "IP-CIDR,10.201.0.0/16,no-resolve"
   #     - "PROCESS-NAME,easytier-core"
-  #   remote_rulesets: []
+  #   remote_rulesets:
+  #     # - "https://gist.githubusercontent.com/username/gist_id/raw/my_easytier_rule.yml"
 
 # ------------------------------------------------------------------------------
 # 4. 自定义分流规则扩展 (可选)
 # 默认使用上游全套成熟规则 (OpenAI, Claude, Apple, Telegram, Steam, 国内直连等)。
-# 若需添加自定义规则，按类别填入，自定义规则拥有最高优先级（插入最前端）。
+# 若需添加自定义规则或引用第三方/个人远端规则，按类别填入，自定义规则拥有最高优先级（插入最前端）。
 # ------------------------------------------------------------------------------
 custom_rules:
   # 直连规则扩展 (Direct)
   direct:
-    remote_rulesets: []
-      # - "https://raw.githubusercontent.com/.../my_direct.list"
-    rules: []
-      # - "DOMAIN-SUFFIX,company.internal"
-      # - "IP-CIDR,10.0.0.0/8,no-resolve"
+    remote_rulesets:
+      # 支持引用公开的第三方规则集或你自己的私有 Gist（支持 .txt / .yaml / .list 自动识别）：
+      # 例如：Loyalsoldier 直连补充规则
+      # - "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt"
+      # 例如：个人 Gist 自定义直连规则
+      # - "https://gist.githubusercontent.com/username/gist_id/raw/my_direct_rule.yml"
+    rules:
+      # 本地行规则支持 DOMAIN-SUFFIX, IP-CIDR, PROCESS-NAME 等
+      - "DOMAIN-SUFFIX,company.internal"
+      - "IP-CIDR,192.168.1.0/24,no-resolve"
 
   # 中转代理规则扩展 (Relay / 海外服务)
   relay:
-    remote_rulesets: []
-    rules: []
-      # - "DOMAIN-SUFFIX,custom-blocked-site.com"
+    remote_rulesets:
+      # 例如：blackmatrix7 规则库的 Proxy 补充规则
+      # - "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Proxy/Proxy.yaml"
+      # 例如：个人 Gist 自定义海外代理规则
+      # - "https://gist.githubusercontent.com/username/gist_id/raw/my_proxy_rule.yml"
+    rules:
+      - "DOMAIN-SUFFIX,custom-blocked-site.com"
 
   # Claude / 独立海外出口规则扩展 (Claude Exit)
   claude_exit:
-    remote_rulesets: []
-    rules: []
-      # - "DOMAIN-SUFFIX,my-anthropic-mirror.com"
+    remote_rulesets:
+      # 例如：独立出口的 Claude 专用域名列表（支持第三方或个人 Gist 地址）
+      # - "https://gist.githubusercontent.com/username/gist_id/raw/my_claude_rule.yml"
+    rules:
+      - "DOMAIN-SUFFIX,my-anthropic-mirror.com"

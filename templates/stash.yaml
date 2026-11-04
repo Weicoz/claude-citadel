@@ -181,7 +181,7 @@ rules:
 - RULE-SET,claude-citadel-direct,DIRECT
 - RULE-SET,claude-citadel-cn-ip,DIRECT
 - GEOIP,CN,DIRECT
-- MATCH,🌐 海外服务
+- MATCH,🇺🇸 海外出口
 rule-providers:
   claude-citadel-claude:
     type: http
