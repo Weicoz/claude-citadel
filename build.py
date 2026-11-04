@@ -430,7 +430,57 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             "proxies": [opt_name]
         })
 
+    # 从 diy_groups 提取自定义机场/测速组与专网分流组
+    custom_auto_groups = []
+    custom_select_groups = []
+    custom_routing_groups = []
+
+    for g_def in diy_groups:
+        g_name = g_def.get("name")
+        if not g_name:
+            continue
+        g_type = g_def.get("type", "select")
+        has_rules = bool(g_def.get("rules")) or bool(g_def.get("remote_rulesets"))
+
+        g_nodes = []
+        for p in g_def.get("proxies", []) or []:
+            if isinstance(p, dict) and "name" in p:
+                g_nodes.append(p["name"])
+            elif isinstance(p, str):
+                g_nodes.append(p)
+        if g_def.get("filter"):
+            pat = g_def["filter"]
+            for p_name in relay_custom_names:
+                if re.search(pat, p_name) and p_name not in g_nodes:
+                    g_nodes.append(p_name)
+
+        grp_dict = {
+            "name": g_name,
+            "type": g_type
+        }
+        if g_type in ["url-test", "fallback"]:
+            grp_dict["url"] = g_def.get("url", "http://www.apple.com/library/test/success.html")
+            grp_dict["interval"] = g_def.get("interval", 300)
+            grp_dict["tolerance"] = g_def.get("tolerance", 50)
+            grp_dict["proxies"] = g_nodes if g_nodes else ["DIRECT"]
+            if "filter" in g_def:
+                grp_dict["filter"] = g_def["filter"]
+            custom_auto_groups.append(grp_dict)
+        elif not has_rules:
+            grp_dict["proxies"] = g_nodes if g_nodes else ["DIRECT"]
+            if "filter" in g_def:
+                grp_dict["filter"] = g_def["filter"]
+            custom_select_groups.append(grp_dict)
+        else:
+            proxies_list = ["DIRECT"] + [n for n in g_nodes if n != "DIRECT"] if g_nodes else ["DIRECT"]
+            grp_dict["proxies"] = proxies_list
+            custom_routing_groups.append(grp_dict)
+
     relay_proxies_summary = ["⚡ 自动择优", "🛟 Fallback"]
+    for g in custom_auto_groups:
+        relay_proxies_summary.append(g["name"])
+    for g in custom_select_groups:
+        relay_proxies_summary.append(g["name"])
     for s in relay_subs:
         name = s.get("name", "")
         emoji = s.get("emoji", "✈️")
@@ -473,6 +523,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             g["proxies"] = relay_custom_names.copy()
             new_groups.append(g)
             new_groups.extend(airport_auto_groups)
+            new_groups.extend(custom_auto_groups)
 
         elif g_name == "🛟 Fallback":
             if relay_provider_ids:
@@ -483,6 +534,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         elif g_name == "🎮 Steam":
             new_groups.append(g)
             new_groups.extend(airport_select_groups)
+            new_groups.extend(custom_select_groups)
 
         elif g_name in region_regexes:
             if relay_provider_ids:
@@ -495,25 +547,15 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         else:
             new_groups.append(g)
 
-    # 动态插入 DIY 自定义策略组：完全由用户自主定义组名、独立节点与专属规则
-    if diy_groups:
+    # 动态插入 DIY 自定义专网策略组 (带专属分流规则)
+    if custom_routing_groups:
         insert_idx = len(new_groups)
         for idx, g in enumerate(new_groups):
             if g.get("name") == "🔗 直连改道":
                 insert_idx = idx + 1
                 break
-        for g_def in diy_groups:
-            g_name = g_def.get("name")
-            if not g_name:
-                continue
-            g_type = g_def.get("type", "select")
-            g_nodes = [p["name"] for p in g_def.get("proxies", []) if isinstance(p, dict) and "name" in p]
-            proxies_list = ["DIRECT"] + g_nodes if g_nodes else ["DIRECT"]
-            new_groups.insert(insert_idx, {
-                "name": g_name,
-                "type": g_type,
-                "proxies": proxies_list
-            })
+        for grp in custom_routing_groups:
+            new_groups.insert(insert_idx, grp)
             insert_idx += 1
 
     # 保证每个策略组都合法，无空 use 或空 proxies 导致内核崩溃
@@ -590,6 +632,8 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
     seen_diy_names = set()
     for g_def in diy_groups:
         for p in g_def.get("proxies", []) or []:
+            if not isinstance(p, dict):
+                continue
             name = p.get("name", "DIY_Proxy")
             if name in seen_diy_names:
                 continue
@@ -665,14 +709,38 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
             g_name = g_def.get("name")
             if not g_name:
                 continue
-            g_nodes = [p["name"] for p in g_def.get("proxies", []) if isinstance(p, dict) and "name" in p]
+            g_type = g_def.get("type", "select")
+            has_rules = bool(g_def.get("rules")) or bool(g_def.get("remote_rulesets"))
+            g_nodes = []
+            for p in g_def.get("proxies", []) or []:
+                if isinstance(p, dict) and "name" in p:
+                    g_nodes.append(p["name"])
+                elif isinstance(p, str):
+                    g_nodes.append(p)
+            if g_def.get("filter"):
+                pat = g_def["filter"]
+                for p_name in relay_names:
+                    if re.search(pat, p_name) and p_name not in g_nodes:
+                        g_nodes.append(p_name)
+
+            if has_rules and "DIRECT" not in g_nodes:
+                g_nodes = ["DIRECT"] + g_nodes if g_nodes else ["DIRECT"]
+            elif not g_nodes:
+                g_nodes = ["DIRECT"]
+
             if client_type in ["surge", "shadowrocket", "loon"]:
-                target_str = ", ".join(["DIRECT"] + g_nodes)
-                diy_line = f"{g_name} = select, {target_str}"
+                if g_type == "url-test":
+                    diy_line = f"{g_name} = url-test, {', '.join(g_nodes)}, url=http://www.apple.com/library/test/success.html, interval=300, tolerance=50"
+                else:
+                    target_str = ", ".join(g_nodes)
+                    diy_line = f"{g_name} = select, {target_str}"
                 content = content.replace("🔗 直连改道", f"{diy_line}\n🔗 直连改道")
             elif client_type == "qx":
-                target_str = ", ".join(["direct"] + g_nodes)
-                diy_line = f"static={g_name}, {target_str}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"
+                if g_type == "url-test":
+                    diy_line = f"url-test={g_name}, {', '.join(g_nodes)}, url=http://www.apple.com/library/test/success.html, interval=300, tolerance=50"
+                else:
+                    target_str = ", ".join(g_nodes)
+                    diy_line = f"static={g_name}, {target_str}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"
                 content = content.replace("static=🔗 直连改道", f"{diy_line}\nstatic=🔗 直连改道")
 
     # 5. 注入自定义分流规则 (Direct / Relay / Claude Exit)
