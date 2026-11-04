@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Sub Hub - 全平台多机场与分层规则构建引擎。
+"""Claude Citadel - 全平台多机场与分层规则构建引擎。
 
 支持客户端：
 1. Clash / Mihomo (clash.yaml)
@@ -55,7 +55,7 @@ def load_profile(profile_path=None, gist_id=None, gh_token=None):
             raw_content = res.stdout
         else:
             token = gh_token or os.environ.get("GH_TOKEN") or os.environ.get("GIST_PAT")
-            headers = {"User-Agent": "Claude-Sub-Hub-Builder"}
+            headers = {"User-Agent": "Claude-Citadel-Builder"}
             if token:
                 headers["Authorization"] = f"token {token}"
             url = f"https://api.github.com/gists/{gist_id}"
@@ -672,7 +672,7 @@ def publish_all_to_gist(gist_id, output_files, gh_token=None):
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"token {token}",
-            "User-Agent": "Claude-Sub-Hub-Builder",
+            "User-Agent": "Claude-Citadel-Builder",
             "Content-Type": "application/json"
         },
         method="PATCH"

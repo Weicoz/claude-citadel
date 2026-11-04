@@ -1,4 +1,4 @@
-# Claude Sub Hub
+# Claude Citadel
 
 > 🚀 **全平台全协议多机场与 Claude 独立出口自动化同步系统**
 >

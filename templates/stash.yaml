@@ -182,7 +182,7 @@ rule-providers:
     behavior: classical
     format: yaml
     path: ./ruleset/claude.yaml
-    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/claude.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/claude.yaml
     interval: 86400
     proxy: DIRECT
   direct-supplement:
@@ -190,7 +190,7 @@ rule-providers:
     behavior: classical
     format: yaml
     path: ./ruleset/direct-supplement.yaml
-    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/public_direct_supplement.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_direct_supplement.yaml
     interval: 86400
     proxy: DIRECT
   proxy-supplement:
@@ -198,7 +198,7 @@ rule-providers:
     behavior: classical
     format: yaml
     path: ./ruleset/proxy-supplement.yaml
-    url: https://raw.githubusercontent.com/Weicoz/claude-sub-hub/main/rules/public_proxy_supplement.yaml
+    url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_proxy_supplement.yaml
     interval: 86400
     proxy: DIRECT
   openai:

@@ -17,7 +17,7 @@ from build import build_clash_stash, build_ini_based_client, validate_with_mihom
 TEMPLATES_DIR = ROOT / "templates"
 
 
-class TestClaudeSubHubBuilder(unittest.TestCase):
+class TestClaudeCitadelBuilder(unittest.TestCase):
 
     def setUp(self):
         self.clash_tpl = TEMPLATES_DIR / "clash.yaml"
