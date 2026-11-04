@@ -33,34 +33,46 @@
 ## 🏗️ 架构拓扑
 
 ```mermaid
-flowchart TD
-    subgraph GIST ["个人私有 Secret Gist"]
-        IN["📄 profile.yaml (机场订阅 + 独立出口 + DIY 规则)"]
-        OUT1["⚙️ claude-citadel-clash.yaml (Clash / Mihomo)"]
-        OUT2["⚙️ claude-citadel-stash.yaml (Stash)"]
-        OUT3["⚙️ claude-citadel-surge.conf (Surge)"]
-        OUT4["⚙️ claude-citadel-loon.conf (Loon)"]
-        OUT5["⚙️ claude-citadel-shadowrocket.conf (Shadowrocket)"]
-        OUT6["⚙️ claude-citadel-qx.conf (Quantumult X)"]
+flowchart LR
+    %% 1. 配置与规则输入源
+    subgraph SRC ["📥 配置与分流规则源"]
+        P["📄 个人私有 profile.yaml<br/>(机场订阅 + 住宅出口 + DIY规则)"]
+        R["🌐 上游权威分流规则<br/>(Claude / OpenAI / Apple / 社区)"]
     end
 
-    subgraph ACTIONS ["GitHub Actions 自动化流水线"]
-        UP["🌐 权威规则库 (Claude / OpenAI / Apple / 社区规则)"]
-        ACT["⚙️ build.py 跨端编译引擎"]
-        VAL{"🔍 mihomo 语法校验"}
-        ERR["❌ 熔断保护 (校验失败保留旧配置)"]
+    %% 2. 云端自动化流水线
+    subgraph CI ["⚙️ GitHub Actions 云端自动化引擎 (定时轮询 / 手动触发)"]
+        BUILD["⚙️ build.py 跨端编译引擎"]
+        VAL{"🔍 mihomo -t<br/>内核语法校验"}
+        ERR["🛑 自动熔断拦截<br/>(保留历史可用版本)"]
+
+        BUILD --> VAL
+        VAL -->|❌ 语法错误| ERR
     end
 
-    IN -->|读取配置| ACT
-    UP -->|注入最新分流| ACT
-    ACT --> VAL
-    VAL -->|校验通过| OUT1
-    VAL -->|校验通过| OUT2
-    VAL -->|校验通过| OUT3
-    VAL -->|校验通过| OUT4
-    VAL -->|校验通过| OUT5
-    VAL -->|校验通过| OUT6
-    VAL -->|校验失败| ERR
+    %% 3. 私有分发中心
+    GIST["☁️ 私有 Secret Gist<br/><b>免密分发中心</b><br/>(一键自动回写 6 端产物)"]
+
+    %% 4. 全平台客户端
+    subgraph CLIENTS ["📱 全平台终端免密消费 (Clients)"]
+        C1["⚡ Clash / Mihomo<br/>claude-citadel-clash.yaml"]
+        C2["🚀 Surge<br/>claude-citadel-surge.conf"]
+        C3["🎈 Loon<br/>claude-citadel-loon.conf"]
+        C4["🔮 Stash<br/>claude-citadel-stash.yaml"]
+        C5["🚀 Shadowrocket<br/>claude-citadel-shadowrocket.conf"]
+        C6["⚙️ Quantumult X<br/>claude-citadel-qx.conf"]
+    end
+
+    P -->|读取配置| BUILD
+    R -->|注入规则| BUILD
+    VAL -->|✅ 校验通过| GIST
+
+    GIST --> C1
+    GIST --> C2
+    GIST --> C3
+    GIST --> C4
+    GIST --> C5
+    GIST --> C6
 ```
 
 ---
