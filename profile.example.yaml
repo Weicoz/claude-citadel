@@ -12,10 +12,10 @@ claude_exits:
   # - false: 直接直连拨号（适合原生可直连的住宅 IP 或专线）
   use_relay_chain: true
 
-  # 形态 A：手动配置节点 (如波特兰 VPS / 独立住宅 IP / 特殊代理出口)
+  # 形态 A：手动配置节点 (如自建 VPS / 独立住宅 IP / 特殊代理出口，地区可自定义)
   # 支持 socks5, http, ss, trojan, vmess 等所有主流协议
   custom_proxies:
-    - name: "🇺🇸 波特兰专用出口"
+    - name: "🇺🇸 专属出口 (自建VPS/住宅IP)"
       type: socks5
       server: 198.51.100.1
       port: 1080

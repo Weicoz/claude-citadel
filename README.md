@@ -31,8 +31,8 @@
 
 ```mermaid
 flowchart TD
-    subgraph 你的个人 Secret Gist
-        IN["📄 profile.yaml (在网页端维护: 机场 + 独立节点 + 自定义规则)"]
+    subgraph GIST ["个人私有 Secret Gist"]
+        IN["📄 profile.yaml (机场订阅 + 独立出口 + 自定义规则)"]
         OUT1["⚙️ clash.yaml (Clash / Mihomo)"]
         OUT2["⚙️ stash.yaml (Stash)"]
         OUT3["⚙️ surge.conf (Surge)"]
@@ -41,17 +41,23 @@ flowchart TD
         OUT6["⚙️ qx.conf (Quantumult X)"]
     end
 
-    subgraph GitHub Actions 自动化流水线
-        UP["上游规则库 (OpenAI / Apple / Claude 规则)"]
-        ACT["build.py 6端编译引擎"]
-        VAL["mihomo -t 离线语法校验"]
+    subgraph ACTIONS ["GitHub Actions 自动化流水线"]
+        UP["🌐 权威规则库 (Claude / OpenAI / Apple / 社区规则)"]
+        ACT["⚙️ build.py 跨端编译引擎"]
+        VAL{"🔍 mihomo 语法校验"}
+        ERR["❌ 熔断保护 (校验失败保留旧配置)"]
     end
 
     IN -->|读取配置| ACT
     UP -->|注入最新分流| ACT
     ACT --> VAL
-    VAL -- 校验通过 --> OUT1 & OUT2 & OUT3 & OUT4 & OUT5 & OUT6
-    VAL -- 校验失败 --> ERR["❌ 熔断保护 (不回写 Gist，旧节点继续稳定使用)"]
+    VAL -->|校验通过| OUT1
+    VAL -->|校验通过| OUT2
+    VAL -->|校验通过| OUT3
+    VAL -->|校验通过| OUT4
+    VAL -->|校验通过| OUT5
+    VAL -->|校验通过| OUT6
+    VAL -->|校验失败| ERR
 ```
 
 ---
@@ -73,7 +79,7 @@ claude_exits:
   # 是否强制经由中转池代理链前置拨号 (住宅 IP 直连不通时设为 true；原生直连设为 false)
   use_relay_chain: true
   custom_proxies:
-    - name: "🇺🇸 波特兰专用出口"
+    - name: "🇺🇸 专属出口 (支持自建 VPS / 原生住宅 IP / 任意地区)"
       type: socks5
       server: 198.51.100.1
       port: 1080
