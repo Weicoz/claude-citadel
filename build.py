@@ -249,6 +249,25 @@ def apply_custom_rules_clash(config, custom_rules):
         if formatted:
             injected_rules.append(formatted)
 
+    # 4. 注入组网自定义规则 (Mesh / 组网访问，如 EasyTier / Tailscale)
+    mesh_cfg = custom_rules.get("mesh", {}) or {}
+    for idx, r_url in enumerate(mesh_cfg.get("remote_rulesets", []) or []):
+        tag = f"custom-mesh-{idx+1}"
+        rule_providers[tag] = {
+            "type": "http",
+            "behavior": "classical",
+            "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
+            "path": f"./ruleset/{tag}.yaml",
+            "url": r_url,
+            "interval": 86400,
+            "proxy": "DIRECT"
+        }
+        injected_rules.append(f"RULE-SET,{tag},🕸️ 组网访问")
+    for r in mesh_cfg.get("rules", []) or []:
+        formatted = format_clash_stash_rule(r, "🕸️ 组网访问")
+        if formatted:
+            injected_rules.append(formatted)
+
     config["rules"] = injected_rules + rules
     config["rule-providers"] = rule_providers
     return config
@@ -287,6 +306,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         if isinstance(p, dict) and "name" in p:
             all_proxies.append(p)
             relay_custom_names.append(p["name"])
+
+    # 处理独立组网节点 (如 EasyTier / Tailscale，不参与日常中转测速)
+    mesh_custom = profile_data.get("mesh_proxies", []) or []
+    mesh_custom_names = []
+    for p in mesh_custom:
+        if isinstance(p, dict) and "name" in p:
+            all_proxies.append(p)
+            mesh_custom_names.append(p["name"])
 
     config["proxies"] = all_proxies
 
@@ -435,6 +462,13 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.append(g)
             new_groups.extend(airport_select_groups)
 
+        elif g_name == "🕸️ 组网访问":
+            if mesh_custom_names:
+                g["proxies"] = ["DIRECT"] + mesh_custom_names
+            else:
+                g["proxies"] = ["DIRECT"]
+            new_groups.append(g)
+
         elif g_name in region_regexes:
             if relay_provider_ids:
                 g["use"] = relay_provider_ids
@@ -510,6 +544,22 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         elif client_type == "qx":
             proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
 
+    mesh_custom = profile_data.get("mesh_proxies", []) or []
+    mesh_names = []
+    for p in mesh_custom:
+        name = p.get("name", "Mesh_Proxy")
+        p_type = p.get("type", "socks5").lower()
+        server = p.get("server", "127.0.0.1")
+        port = p.get("port", 15555)
+        mesh_names.append(name)
+
+        if client_type in ["surge", "shadowrocket"]:
+            proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
+        elif client_type == "loon":
+            proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
+        elif client_type == "qx":
+            proxy_lines.append(f"{p_type}={server}:{port}, tag={name}")
+
     # 2. 插入节点
     if client_type in ["surge", "shadowrocket", "loon"]:
         content = content.replace("[Proxy]\n", "[Proxy]\n" + "\n".join(proxy_lines) + "\n" if proxy_lines else "[Proxy]\n")
@@ -565,6 +615,14 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         content = content.replace("🇺🇸 海外出口 = select,DIRECT", f"🇺🇸 海外出口 = select,{target_line}")
         content = content.replace("static=🇺🇸 海外出口, direct", f"static=🇺🇸 海外出口, {target_line}")
 
+    # 插入组网指定节点 (EasyTier 等)
+    if mesh_names:
+        mesh_target_surge = ", ".join(["DIRECT"] + mesh_names)
+        mesh_target_qx = ", ".join(["direct"] + mesh_names)
+        content = content.replace("🕸️ 组网访问 = select, DIRECT", f"🕸️ 组网访问 = select, {mesh_target_surge}")
+        content = content.replace("🕸️ 组网访问 = select,DIRECT", f"🕸️ 组网访问 = select,{mesh_target_surge}")
+        content = content.replace("static=🕸️ 组网访问, direct", f"static=🕸️ 组网访问, {mesh_target_qx}")
+
     # 5. 注入自定义分流规则 (Direct / Relay / Claude Exit)
     injected_rules = []
     if custom_rules:
@@ -610,6 +668,19 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
                 content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-relay, force-remote-spec=true\n")
         for r in (custom_rules.get("relay", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "🔀 中转节点")
+            if fmt:
+                injected_rules.append(fmt)
+
+        # Mesh / 组网访问 (EasyTier / Tailscale)
+        for r_url in (custom_rules.get("mesh", {}) or {}).get("remote_rulesets", []) or []:
+            if client_type == "loon":
+                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🕸️ 组网访问,tag=custom-mesh,enabled=true\n")
+            elif client_type in ["surge", "shadowrocket"]:
+                injected_rules.append(f"RULE-SET,{r_url},🕸️ 组网访问")
+            elif client_type == "qx":
+                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag=custom-mesh, force-remote-spec=true\n")
+        for r in (custom_rules.get("mesh", {}) or {}).get("rules", []) or []:
+            fmt = format_rule_for_client(r, "🕸️ 组网访问")
             if fmt:
                 injected_rules.append(fmt)
 

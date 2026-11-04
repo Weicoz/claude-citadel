@@ -177,6 +177,42 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
             if f_stash_path.is_file():
                 f_stash_path.unlink()
 
+    def test_mesh_proxies_and_regional_groups(self):
+        """测试 EasyTier 等组网独立节点不污染常规中转池，并验证 Apple/Steam 包含日美新等区域组。"""
+        profile = {
+            "mesh_proxies": [
+                {"name": "EasyTier SOCKS5", "type": "socks5", "server": "127.0.0.1", "port": 15555}
+            ],
+            "custom_rules": {
+                "mesh": {
+                    "rules": ["IP-CIDR,10.200.0.0/16,no-resolve"]
+                }
+            }
+        }
+        cfg_clash = build_clash_stash(self.clash_tpl, profile, client_type="clash")
+        groups = {g["name"]: g for g in cfg_clash["proxy-groups"]}
+
+        # 1. 验证 EasyTier 节点在 🕸️ 组网访问 中，但绝不在 🔀 中转节点 或 ⚡ 自动择优 中
+        self.assertIn("EasyTier SOCKS5", groups["🕸️ 组网访问"]["proxies"])
+        self.assertNotIn("EasyTier SOCKS5", groups["🔀 中转节点"]["proxies"])
+        self.assertNotIn("EasyTier SOCKS5", groups["⚡ 自动择优"]["proxies"])
+
+        # 2. 验证 Apple 与 Steam 包含日、美、新、港等策略组
+        for g_name in ["🍎 Apple", "🎮 Steam"]:
+            self.assertIn("🇯🇵 日本节点", groups[g_name]["proxies"])
+            self.assertIn("🇺🇸 美国节点", groups[g_name]["proxies"])
+            self.assertIn("🇸🇬 新加坡节点", groups[g_name]["proxies"])
+            self.assertIn("🇭🇰 香港节点", groups[g_name]["proxies"])
+
+        # 3. 验证规则注入正确指向 🕸️ 组网访问
+        self.assertIn("IP-CIDR,10.200.0.0/16,🕸️ 组网访问,no-resolve", cfg_clash["rules"])
+
+        # 4. 验证 Surge / Loon / SR / QX 包含组网节点且 Apple/Steam 包含区域节点
+        surge_out = build_ini_based_client(self.surge_tpl, profile, client_type="surge")
+        self.assertIn("EasyTier SOCKS5", surge_out)
+        self.assertIn("🕸️ 组网访问 = select, DIRECT, EasyTier SOCKS5", surge_out)
+        self.assertIn("🍎 Apple = select, DIRECT, 🔀 中转节点, ⚡ 自动择优, 🇭🇰 香港节点, 🇯🇵 日本节点, 🇺🇸 美国节点, 🇸🇬 新加坡节点, 🇹🇼 台湾节点", surge_out)
+
 
 if __name__ == "__main__":
     unittest.main()

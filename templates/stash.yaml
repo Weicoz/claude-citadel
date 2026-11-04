@@ -100,13 +100,23 @@ proxy-groups:
   proxies:
   - DIRECT
   - 🔀 中转节点
+  - ⚡ 自动择优
   - 🇭🇰 香港节点
+  - 🇯🇵 日本节点
+  - 🇺🇸 美国节点
+  - 🇸🇬 新加坡节点
+  - 🇹🇼 台湾节点
 - name: 🎮 Steam
   type: select
   proxies:
   - DIRECT
   - 🔀 中转节点
+  - ⚡ 自动择优
   - 🇭🇰 香港节点
+  - 🇯🇵 日本节点
+  - 🇺🇸 美国节点
+  - 🇸🇬 新加坡节点
+  - 🇹🇼 台湾节点
 - name: 🔗 直连改道
   type: select
   proxies:
