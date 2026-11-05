@@ -337,7 +337,19 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type=
             if formatted:
                 injected_rules.append(formatted)
 
-    config["rules"] = injected_rules + rules
+    # 去重：只删除与模板或彼此「完全一致」的行，避免同一规则重复两遍。
+    # 不按大小写或尾部标志归一化：PROCESS-NAME / PROCESS-NAME-REGEX / 策略组名大小写敏感，
+    # 尾部标志（no-resolve 等）不同代表不同语义；注入版保持置顶，用户可用它覆盖模板版。
+    existing = set(rules)
+    seen = set()
+    deduped = []
+    for r in injected_rules:
+        if r in existing or r in seen:
+            continue
+        seen.add(r)
+        deduped.append(r)
+
+    config["rules"] = deduped + rules
     config["rule-providers"] = rule_providers
     return config
 
@@ -921,6 +933,8 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
 
     # 5. 注入自定义分流规则 (Direct / Relay / Claude Exit)
     injected_rules = []
+    loon_remote = []
+    qx_remote = []
     if custom_rules:
         def format_rule_for_client(r_text, default_tgt):
             if client_type == "qx":
@@ -932,11 +946,11 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         for idx, r_url in enumerate((custom_rules.get("claude_exit", {}) or {}).get("remote_rulesets", []) or []):
             tag = f"claude-citadel-custom-claude-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🇺🇸 海外出口,tag={tag},enabled=true\n")
+                loon_remote.append(f"{r_url},policy=🇺🇸 海外出口,tag={tag},enabled=true")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},🇺🇸 海外出口")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
+                qx_remote.append(f"{r_url}, tag={tag}, force-remote-spec=true")
         for r in (custom_rules.get("claude_exit", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "🇺🇸 海外出口")
             if fmt:
@@ -946,11 +960,11 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         for idx, r_url in enumerate((custom_rules.get("direct", {}) or {}).get("remote_rulesets", []) or []):
             tag = f"claude-citadel-custom-direct-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=DIRECT,tag={tag},enabled=true\n")
+                loon_remote.append(f"{r_url},policy=DIRECT,tag={tag},enabled=true")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},DIRECT")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
+                qx_remote.append(f"{r_url}, tag={tag}, force-remote-spec=true")
         for r in (custom_rules.get("direct", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "DIRECT")
             if fmt:
@@ -960,11 +974,11 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         for idx, r_url in enumerate((custom_rules.get("relay", {}) or {}).get("remote_rulesets", []) or []):
             tag = f"claude-citadel-custom-relay-{idx+1}"
             if client_type == "loon":
-                content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy=🔀 中转节点,tag={tag},enabled=true\n")
+                loon_remote.append(f"{r_url},policy=🔀 中转节点,tag={tag},enabled=true")
             elif client_type in ["surge", "shadowrocket"]:
                 injected_rules.append(f"RULE-SET,{r_url},🔀 中转节点")
             elif client_type == "qx":
-                content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
+                qx_remote.append(f"{r_url}, tag={tag}, force-remote-spec=true")
         for r in (custom_rules.get("relay", {}) or {}).get("rules", []) or []:
             fmt = format_rule_for_client(r, "🔀 中转节点")
             if fmt:
@@ -979,15 +993,23 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
             for idx, r_url in enumerate(g_def.get("remote_rulesets", []) or []):
                 tag = f"claude-citadel-diy-{tag_prefix}-{idx+1}"
                 if client_type == "loon":
-                    content = content.replace("[Remote Rule]\n", f"[Remote Rule]\n{r_url},policy={g_name},tag={tag},enabled=true\n")
+                    loon_remote.append(f"{r_url},policy={g_name},tag={tag},enabled=true")
                 elif client_type in ["surge", "shadowrocket"]:
                     injected_rules.append(f"RULE-SET,{r_url},{g_name}")
                 elif client_type == "qx":
-                    content = content.replace("[filter_remote]\n", f"[filter_remote]\n{r_url}, tag={tag}, force-remote-spec=true\n")
+                    qx_remote.append(f"{r_url}, tag={tag}, force-remote-spec=true")
             for r in g_def.get("rules", []) or []:
                 fmt = format_rule_for_client(r, g_name)
                 if fmt:
                     injected_rules.append(fmt)
+
+    if loon_remote:
+        content = content.replace("[Remote Rule]\n", "[Remote Rule]\n" + "\n".join(loon_remote) + "\n")
+    elif client_type == "loon":
+        # 无自定义远端规则时移除空段，避免部分客户端对空 section 报错
+        content = content.replace("[Remote Rule]\n\n", "")
+    if qx_remote:
+        content = content.replace("[filter_remote]\n", "[filter_remote]\n" + "\n".join(qx_remote) + "\n")
 
     if injected_rules:
         rule_block = "\n".join(injected_rules) + "\n"
@@ -1011,14 +1033,19 @@ def validate_with_mihomo(config_path):
             return True
 
     log(f"正在使用 {mihomo_bin} 静态检验 {config_path.name} ...")
-    res = subprocess.run([str(mihomo_bin), "-t", "-f", str(config_path)],
-                         capture_output=True, text=True)
+    try:
+        res = subprocess.run([str(mihomo_bin), "-t", "-f", str(config_path)],
+                             capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        log(f"{config_path.name} 内核校验超时（120s），已中断。", "ERROR")
+        return False
     if res.returncode == 0:
         log(f"{config_path.name} 内核语法校验通过！", "SUCCESS")
         return True
-    else:
-        log(f"{config_path.name} 语法校验失败:\n{res.stderr}", "ERROR")
-        return False
+    # mihomo 的报错可能写在 stdout 也可能在 stderr，两者都要保留，避免互相遮蔽
+    detail = "\n".join(x.strip() for x in (res.stdout, res.stderr) if x and x.strip())
+    log(f"{config_path.name} 语法校验失败:\n{detail or '(内核未输出错误详情)'}", "ERROR")
+    return False
 
 
 def publish_all_to_gist(gist_id, output_files, gh_token=None):

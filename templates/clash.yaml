@@ -197,7 +197,7 @@ rules:
 - RULE-SET,claude-citadel-proxy-supplement,🇺🇸 海外出口
 - RULE-SET,claude-citadel-openai,🤖 OpenAI
 - RULE-SET,claude-citadel-google-ai,🚀 Google AI
-- RULE-SET,claude-citadel-telegram,✈️ Telegram
+- RULE-SET,claude-citadel-telegram,✈️ Telegram,no-resolve
 - RULE-SET,claude-citadel-apple,🍎 Apple
 - RULE-SET,claude-citadel-steam,🎮 Steam
 - RULE-SET,claude-citadel-discord,🌐 海外服务
@@ -205,7 +205,7 @@ rules:
 - RULE-SET,claude-citadel-mail,📧 邮件收件
 - RULE-SET,claude-citadel-gfw,🌐 海外服务
 - RULE-SET,claude-citadel-direct,DIRECT
-- RULE-SET,claude-citadel-cn-ip,DIRECT
+- RULE-SET,claude-citadel-cn-ip,DIRECT,no-resolve
 - GEOIP,CN,DIRECT
 - MATCH,🇺🇸 海外出口
 rule-providers:
@@ -251,16 +251,16 @@ rule-providers:
     proxy: 🔀 中转节点
   claude-citadel-telegram:
     type: http
-    behavior: classical
-    format: text
+    behavior: ipcidr
+    format: yaml
     path: ./ruleset/claude-citadel-telegram.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt
     interval: 86400
     proxy: 🔀 中转节点
   claude-citadel-apple:
     type: http
-    behavior: classical
-    format: text
+    behavior: domain
+    format: yaml
     path: ./ruleset/claude-citadel-apple.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
     interval: 86400
@@ -299,16 +299,16 @@ rule-providers:
     proxy: 🔀 中转节点
   claude-citadel-gfw:
     type: http
-    behavior: classical
-    format: text
+    behavior: domain
+    format: yaml
     path: ./ruleset/claude-citadel-gfw.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt
     interval: 86400
     proxy: 🔀 中转节点
   claude-citadel-direct:
     type: http
-    behavior: classical
-    format: text
+    behavior: domain
+    format: yaml
     path: ./ruleset/claude-citadel-direct.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
     interval: 86400
@@ -316,7 +316,7 @@ rule-providers:
   claude-citadel-cn-ip:
     type: http
     behavior: ipcidr
-    format: text
+    format: yaml
     path: ./ruleset/claude-citadel-cn-ip.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
     interval: 86400

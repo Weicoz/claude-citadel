@@ -374,28 +374,179 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(g_select["use"], [list(providers.keys())[0]])
 
     def test_rule_providers_proxy_routing(self):
-        """测试 rule-providers 在 Clash 中走中转节点，避免直连 GitHub EOF，且 Stash 不含非法 proxy 字段。"""
+        """规则集按正常分流走中转组；订阅保持直连；格式声明与去重正确。"""
         profile = {
+            "claude_exits": {
+                "use_relay_chain": False,
+                "custom_proxies": [
+                    {"name": "🇺🇸 专属出口", "type": "socks5", "server": "198.51.100.1", "port": 1080}
+                ],
+            },
+            "relays": {
+                "subscriptions": [
+                    {"name": "测试机场", "url": "https://sub.example.com/api/v1/client/subscribe?token=x"}
+                ],
+            },
             "custom_rules": {
                 "claude_exit": {
-                    "remote_rulesets": ["https://raw.githubusercontent.com/test/claude.yaml"]
+                    "remote_rulesets": ["https://raw.githubusercontent.com/test/claude.yaml"],
+                    # 与模板内置规则重复，用于验证去重
+                    "rules": ["DOMAIN-SUFFIX,ipify.org,🇺🇸 海外出口"],
                 },
                 "direct": {
                     "remote_rulesets": ["https://raw.githubusercontent.com/test/direct.yaml"]
+                },
+                "relay": {
+                    "remote_rulesets": ["https://raw.githubusercontent.com/test/relay.yaml"]
+                },
+            },
+            "diy_groups": [
+                {
+                    "name": "🏢 公司专网",
+                    "type": "select",
+                    "remote_rulesets": ["https://raw.githubusercontent.com/test/corp.yaml"],
+                    "proxies": [
+                        {"name": "🏢 公司前置", "type": "socks5", "server": "192.0.2.10", "port": 1080}
+                    ],
                 }
-            }
+            ],
         }
         clash_cfg = build_clash_stash(self.clash_tpl, profile, "clash")
         stash_cfg = build_clash_stash(self.stash_tpl, profile, "stash")
 
-        # Clash: 所有 rule-providers 必须走 🔀 中转节点，绝不能是 DIRECT
-        for rp_name, rp in clash_cfg.get("rule-providers", {}).items():
-            self.assertEqual(rp.get("proxy"), "🔀 中转节点", f"{rp_name} proxy 应为 🔀 中转节点")
+        # 规则集走正常中转组，且该组必须真实存在
+        for cfg, label in ((clash_cfg, "clash"), (stash_cfg, "stash")):
+            group_names = {g["name"] for g in cfg["proxy-groups"]}
+            self.assertIn("🔀 中转节点", group_names, f"{label} 缺少中转组")
 
-        # Stash: 绝不能包含 proxy: DIRECT 字段
-        for rp_name, rp in stash_cfg.get("rule-providers", {}).items():
+        # 四个注入分支都要覆盖到
+        tags = set(clash_cfg["rule-providers"])
+        for expected in (
+            "claude-citadel-custom-claude-1",
+            "claude-citadel-custom-direct-1",
+            "claude-citadel-custom-relay-1",
+        ):
+            self.assertIn(expected, tags, f"缺少注入分支 {expected}")
+        self.assertTrue(
+            any(t.startswith("claude-citadel-diy-") for t in tags), "缺少 DIY 策略组规则集分支"
+        )
+
+        # Clash: 规则集按正常分流走中转组，不得回退 DIRECT
+        for rp_name, rp in clash_cfg["rule-providers"].items():
+            self.assertEqual(rp.get("proxy"), "🔀 中转节点", f"{rp_name} 下载出口错误")
+
+        # 负例：任何 rule-provider 的 proxy 必须是已存在的策略组名
+        group_names = {g["name"] for g in clash_cfg["proxy-groups"]}
+        for rp_name, rp in clash_cfg["rule-providers"].items():
+            self.assertIn(rp.get("proxy"), group_names, f"{rp_name} 指向不存在的组")
+
+        # 订阅下载必须保持 DIRECT：若指向依赖订阅节点的组，会形成自举环
+        for pp_name, pp in clash_cfg["proxy-providers"].items():
+            self.assertEqual(pp.get("proxy"), "DIRECT", f"{pp_name} 订阅下载应直连")
+
+        # 注入规则与模板规则重复时只保留一份
+        self.assertEqual(
+            clash_cfg["rules"].count("DOMAIN-SUFFIX,ipify.org,🇺🇸 海外出口"), 1, "规则未去重"
+        )
+
+        # 去重只针对完全一致的行；标志或大小写不同代表不同语义，注入版保持置顶
+        dedup_cfg = build_clash_stash(
+            self.clash_tpl,
+            {"custom_rules": {"direct": {"rules": [
+                "GEOIP,CN,DIRECT,no-resolve",
+                "IP-CIDR,10.0.0.0/8,DIRECT,src",
+                "PROCESS-NAME,Claude,DIRECT",
+            ]}}},
+            "clash",
+        )
+        dedup_rules = dedup_cfg["rules"]
+        self.assertIn("GEOIP,CN,DIRECT,no-resolve", dedup_rules, "注入的更严格版本丢失")
+        self.assertIn("GEOIP,CN,DIRECT", dedup_rules, "模板版本不应被删除")
+        self.assertLess(
+            dedup_rules.index("GEOIP,CN,DIRECT,no-resolve"),
+            dedup_rules.index("GEOIP,CN,DIRECT"),
+            "注入规则应置于模板规则之前",
+        )
+        self.assertIn("IP-CIDR,10.0.0.0/8,DIRECT,src", dedup_rules, "src 规则被误合并")
+        self.assertIn("PROCESS-NAME,Claude,DIRECT", dedup_rules, "大小写敏感规则被误合并")
+        self.assertIn("PROCESS-NAME,claude,🇺🇸 海外出口", dedup_rules, "模板小写规则被误删")
+
+        # 上游规则集格式声明：Loyalsoldier/blackmatrix7 的 .txt 实际是 YAML payload
+        expected_formats = {
+            "claude-citadel-apple": ("domain", "yaml"),
+            "claude-citadel-direct": ("domain", "yaml"),
+            "claude-citadel-gfw": ("domain", "yaml"),
+            "claude-citadel-telegram": ("ipcidr", "yaml"),
+            "claude-citadel-cn-ip": ("ipcidr", "yaml"),
+        }
+        for name, (behavior, fmt) in expected_formats.items():
+            rp = clash_cfg["rule-providers"][name]
+            self.assertEqual(rp["behavior"], behavior, f"{name} behavior 错误")
+            self.assertEqual(rp["format"], fmt, f"{name} format 错误")
+
+        # Stash 侧：同样的格式声明、no-resolve 与镜像地址
+        for name, (behavior, fmt) in expected_formats.items():
+            rp = stash_cfg["rule-providers"][name]
+            self.assertEqual((rp["behavior"], rp["format"]), (behavior, fmt), f"stash {name} 声明错误")
+        for name in ("claude-citadel-telegram", "claude-citadel-cn-ip"):
+            self.assertTrue(
+                any(r.startswith(f"RULE-SET,{name},") and r.endswith(",no-resolve")
+                    for r in stash_cfg["rules"]),
+                f"stash {name} 缺少 no-resolve",
+            )
+        for name, rp in stash_cfg["rule-providers"].items():
+            if name.startswith(("claude-citadel-custom-", "claude-citadel-diy-")):
+                continue  # 用户自定义远端规则集保持原地址
+            self.assertIn("cdn.jsdelivr.net", rp["url"], f"stash {name} 未使用镜像地址")
+
+        # ipcidr 规则集必须带 no-resolve，避免无谓解析
+        for name in ("claude-citadel-telegram", "claude-citadel-cn-ip"):
+            self.assertTrue(
+                any(r.startswith(f"RULE-SET,{name},") and r.endswith(",no-resolve")
+                    for r in clash_cfg["rules"]),
+                f"{name} 缺少 no-resolve",
+            )
+
+        # Stash 不支持 rule-providers 的 proxy 字段
+        for rp_name, rp in stash_cfg["rule-providers"].items():
             self.assertNotIn("proxy", rp, f"Stash {rp_name} 不应包含 proxy 字段")
 
+
+    def test_ini_remote_rules_order(self):
+        """Loon / QX 远端规则集按 claude→direct→relay 顺序注入；无自定义规则时不残留空段。"""
+        profile = {
+            "custom_rules": {
+                "claude_exit": {"remote_rulesets": ["https://example.com/claude.list"]},
+                "direct": {"remote_rulesets": ["https://example.com/direct.list"]},
+                "relay": {"remote_rulesets": ["https://example.com/relay.list"]},
+            }
+        }
+        for tpl, client in ((self.loon_tpl, "loon"), (self.qx_tpl, "qx")):
+            text = build_ini_based_client(tpl, profile, client)
+            pos = [text.find(f"https://example.com/{name}.list") for name in ("claude", "direct", "relay")]
+            self.assertTrue(all(p >= 0 for p in pos), f"{client} 缺少注入的远端规则集")
+            self.assertEqual(pos, sorted(pos), f"{client} 远端规则集注入顺序错误")
+
+        empty_loon = build_ini_based_client(self.loon_tpl, {}, "loon")
+        self.assertNotIn("[Remote Rule]", empty_loon, "无自定义规则时残留空段")
+
+    def test_ini_cncidr_and_validator(self):
+        """ini 四端使用 Surge 格式的 cn CIDR；内核校验失败时必须返回 False。"""
+        for tpl, client in (
+            (self.surge_tpl, "surge"),
+            (self.shadowrocket_tpl, "shadowrocket"),
+            (self.qx_tpl, "qx"),
+        ):
+            text = build_ini_based_client(tpl, {}, client)
+            self.assertIn("surge-rules/release/ruleset/cncidr.txt", text, f"{client} 未使用 Surge 格式规则集")
+            self.assertNotIn("clash-rules/release/cncidr.txt", text, f"{client} 仍在用 Clash 格式规则集")
+
+        bad = Path(tempfile.mkstemp(suffix=".yaml")[1])
+        bad.write_text("rules:\n- BOGUS-RULE,foo\n", encoding="utf-8")
+        try:
+            self.assertFalse(validate_with_mihomo(bad), "坏配置应校验失败")
+        finally:
+            bad.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     unittest.main()
