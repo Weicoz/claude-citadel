@@ -66,14 +66,16 @@ proxy-groups:
   - 🛟 Fallback
 - name: ⚡ 自动择优
   type: url-test
-  url: http://www.apple.com/library/test/success.html
-  interval: 300
-  tolerance: 50
+  url: http://cp.cloudflare.com/generate_204
+  expected-status: "204"
+  interval: 90
+  tolerance: 100
   proxies: []
 - name: 🛟 Fallback
   type: fallback
-  url: http://www.apple.com/library/test/success.html
-  interval: 300
+  url: http://cp.cloudflare.com/generate_204
+  expected-status: "204"
+  interval: 90
   proxies: []
 - name: 🌐 海外服务
   type: select

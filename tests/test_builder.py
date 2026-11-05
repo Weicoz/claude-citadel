@@ -333,6 +333,41 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         sr_out = build_ini_based_client(self.shadowrocket_tpl, profile, "shadowrocket")
         self.assertIn("🛟 Fallback = fallback,⚡ 良心专线 自动择优,⚡ TNT专线 自动择优,⚡ 猫咪云 自动择优,⚡ Amy 自动择优,url=", sr_out)
 
+    def test_golden_ratio_health_check_parameters(self):
+        """测试健康检查黄金平衡参数：Cloudflare 204、4000ms 超时、100ms 容差、分级周期与后台温备。"""
+        profile = {
+            "relays": {
+                "subscriptions": [
+                    {"name": "主用机场", "emoji": "❤️", "url": "https://sub.primary.com/sub"},
+                    {"name": "备用机场", "emoji": "🚀", "url": "https://sub.standby.com/sub"},
+                ]
+            }
+        }
+
+        # 1. Clash / Mihomo 校验
+        clash_cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        providers = clash_cfg["proxy-providers"]
+
+        # 主用机场：90s 探测，后台保活
+        p_primary = providers[list(providers.keys())[0]]
+        self.assertEqual(p_primary["health-check"]["url"], "http://cp.cloudflare.com/generate_204")
+        self.assertEqual(p_primary["health-check"]["expected-status"], "204")
+        self.assertEqual(p_primary["health-check"]["interval"], 90)
+        self.assertEqual(p_primary["health-check"]["timeout"], 4000)
+        self.assertFalse(p_primary["health-check"]["lazy"])
+
+        # 备用机场：300s 探测，强制温备 (lazy: false)
+        p_standby = providers[list(providers.keys())[1]]
+        self.assertEqual(p_standby["health-check"]["interval"], 300)
+        self.assertFalse(p_standby["health-check"]["lazy"])
+
+        # 策略组校验：expected-status 与 4000ms
+        groups = {g["name"]: g for g in clash_cfg["proxy-groups"]}
+        g_auto = groups["⚡ 自动择优"]
+        self.assertEqual(g_auto["url"], "http://cp.cloudflare.com/generate_204")
+        self.assertEqual(g_auto["expected-status"], "204")
+        self.assertEqual(g_auto["tolerance"], 100)
+
 
 if __name__ == "__main__":
     unittest.main()

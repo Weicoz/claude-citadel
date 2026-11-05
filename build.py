@@ -31,6 +31,12 @@ TEMPLATES_DIR = ROOT / "templates"
 OUTPUT_DIR = ROOT / "output"
 
 DEFAULT_EXCLUDE_FILTER = "(?i)剩余流量|套餐到期|重置|官网|过期|公告|通知|距离下次|traffic|expire|reset"
+DEFAULT_PROBE_URL = "http://cp.cloudflare.com/generate_204"
+DEFAULT_EXPECTED_STATUS = "204"
+DEFAULT_TIMEOUT = 4000
+DEFAULT_TOLERANCE = 100
+DEFAULT_PRIMARY_INTERVAL = 90
+DEFAULT_STANDBY_INTERVAL = 300
 
 
 def log(msg, level="INFO"):
@@ -405,6 +411,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         relay_provider_ids.append(pid)
         prefix = f"[{s.get('name', pid)}] "
 
+        is_primary = (idx == 1)
         prov = {
             "type": "http",
             "url": s["url"],
@@ -413,10 +420,11 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             "proxy": "DIRECT",
             "health-check": {
                 "enable": True,
-                "url": "http://www.apple.com/library/test/success.html",
-                "interval": 300,
-                "timeout": 5000,
-                "lazy": True
+                "url": DEFAULT_PROBE_URL,
+                "expected-status": DEFAULT_EXPECTED_STATUS,
+                "interval": DEFAULT_PRIMARY_INTERVAL if is_primary else DEFAULT_STANDBY_INTERVAL,
+                "timeout": DEFAULT_TIMEOUT,
+                "lazy": False
             },
             "exclude-type": "direct|reject|compatible|pass",
             "exclude-filter": DEFAULT_EXCLUDE_FILTER,
@@ -445,10 +453,11 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             "proxy": "DIRECT",
             "health-check": {
                 "enable": True,
-                "url": "http://www.apple.com/library/test/success.html",
-                "interval": 300,
-                "timeout": 5000,
-                "lazy": True
+                "url": DEFAULT_PROBE_URL,
+                "expected-status": DEFAULT_EXPECTED_STATUS,
+                "interval": DEFAULT_PRIMARY_INTERVAL,
+                "timeout": DEFAULT_TIMEOUT,
+                "lazy": False
             },
             "exclude-type": "direct|reject|compatible|pass",
             "override": {
@@ -464,18 +473,21 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     airport_auto_groups = []
     airport_select_groups = []
 
-    for s, pid in zip(relay_subs, relay_provider_ids):
+    for idx, (s, pid) in enumerate(zip(relay_subs, relay_provider_ids), 1):
         name = s.get("name", pid)
         emoji = s.get("emoji", "✈️")
         opt_name = f"⚡ {name} 自动择优"
         select_name = f"{emoji} {name}"
 
+        is_primary = (idx == 1)
         airport_auto_groups.append({
             "name": opt_name,
             "type": "url-test",
-            "url": "http://www.apple.com/library/test/success.html",
-            "interval": 300,
-            "tolerance": 50,
+            "url": DEFAULT_PROBE_URL,
+            "expected-status": DEFAULT_EXPECTED_STATUS,
+            "interval": DEFAULT_PRIMARY_INTERVAL if is_primary else DEFAULT_STANDBY_INTERVAL,
+            "timeout": DEFAULT_TIMEOUT,
+            "tolerance": DEFAULT_TOLERANCE,
             "use": [pid]
         })
         airport_select_groups.append({
@@ -523,9 +535,11 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             "type": g_type
         }
         if g_type in ["url-test", "fallback"]:
-            grp_dict["url"] = g_def.get("url", "http://www.apple.com/library/test/success.html")
-            grp_dict["interval"] = g_def.get("interval", 300)
-            grp_dict["tolerance"] = g_def.get("tolerance", 50)
+            grp_dict["url"] = g_def.get("url", DEFAULT_PROBE_URL)
+            grp_dict["expected-status"] = str(g_def.get("expected-status", DEFAULT_EXPECTED_STATUS))
+            grp_dict["interval"] = g_def.get("interval", DEFAULT_PRIMARY_INTERVAL)
+            grp_dict["timeout"] = g_def.get("timeout", DEFAULT_TIMEOUT)
+            grp_dict["tolerance"] = g_def.get("tolerance", DEFAULT_TOLERANCE)
             grp_dict["proxies"] = g_nodes if g_nodes else ["DIRECT"]
             if "filter" in g_def:
                 grp_dict["filter"] = g_def["filter"]
@@ -603,6 +617,11 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             if relay_provider_ids:
                 g["use"] = relay_provider_ids
             g["proxies"] = relay_custom_names.copy()
+            g["url"] = DEFAULT_PROBE_URL
+            g["expected-status"] = DEFAULT_EXPECTED_STATUS
+            g["interval"] = DEFAULT_PRIMARY_INTERVAL
+            g["timeout"] = DEFAULT_TIMEOUT
+            g["tolerance"] = DEFAULT_TOLERANCE
             new_groups.append(g)
             new_groups.extend(airport_auto_groups)
             new_groups.extend(custom_auto_groups)
@@ -627,13 +646,22 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                 elif "use" in g and not custom_fallback_def.get("use"):
                     del g["use"]
 
-                for k in ["url", "interval", "tolerance", "filter"]:
+                for k in ["url", "interval", "timeout", "tolerance", "expected-status", "filter"]:
                     if k in custom_fallback_def:
                         g[k] = custom_fallback_def[k]
+                if "url" not in g:
+                    g["url"] = DEFAULT_PROBE_URL
+                if "expected-status" not in g:
+                    g["expected-status"] = DEFAULT_EXPECTED_STATUS
+                if "interval" not in g:
+                    g["interval"] = DEFAULT_PRIMARY_INTERVAL
             else:
                 if relay_provider_ids:
                     g["use"] = relay_provider_ids
                 g["proxies"] = relay_custom_names.copy()
+                g["url"] = DEFAULT_PROBE_URL
+                g["expected-status"] = DEFAULT_EXPECTED_STATUS
+                g["interval"] = DEFAULT_PRIMARY_INTERVAL
             new_groups.append(g)
 
         elif g_name == "🎮 Steam":
@@ -871,14 +899,14 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
 
             if client_type in ["surge", "shadowrocket", "loon"]:
                 if g_type == "url-test":
-                    diy_line = f"{g_name} = url-test, {', '.join(g_nodes)}, url=http://www.apple.com/library/test/success.html, interval=300, tolerance=50"
+                    diy_line = f"{g_name} = url-test, {', '.join(g_nodes)}, url={DEFAULT_PROBE_URL}, interval={DEFAULT_PRIMARY_INTERVAL}, tolerance={DEFAULT_TOLERANCE}"
                 else:
                     target_str = ", ".join(g_nodes)
                     diy_line = f"{g_name} = select, {target_str}"
                 content = content.replace("🔗 直连改道", f"{diy_line}\n🔗 直连改道")
             elif client_type == "qx":
                 if g_type == "url-test":
-                    diy_line = f"url-test={g_name}, {', '.join(g_nodes)}, url=http://www.apple.com/library/test/success.html, interval=300, tolerance=50"
+                    diy_line = f"url-test={g_name}, {', '.join(g_nodes)}, url={DEFAULT_PROBE_URL}, interval={DEFAULT_PRIMARY_INTERVAL}, tolerance={DEFAULT_TOLERANCE}"
                 else:
                     target_str = ", ".join(g_nodes)
                     diy_line = f"static={g_name}, {target_str}, img-url=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Round_Robin.png"

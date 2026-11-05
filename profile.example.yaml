@@ -110,9 +110,11 @@ diy_groups: []
   # - name: "⚡ 独立机场 自动择优" # 第三个示例：为自建/特定机场节点创建专属自动择优组
   #   type: url-test
   #   filter: "(?i)Amy" # 支持正则自动匹配节点名，或显式列出节点名
-  #   url: "http://www.apple.com/library/test/success.html"
-  #   interval: 300
-  #   tolerance: 50
+  #   url: "http://cp.cloudflare.com/generate_204"
+  #   expected-status: "204"
+  #   interval: 90
+  #   timeout: 4000
+  #   tolerance: 100
   #
   # - name: "✈️ 独立机场" # 第四个示例：专属机场选择组 (自动挂载进「🔀 中转节点」供日常选路)
   #   type: select
@@ -122,8 +124,10 @@ diy_groups: []
   #
   # - name: "🛟 Fallback" # 第五个示例：自定义故障转移 (Fallback) 顺序与置顶规则
   #   type: fallback
-  #   url: "http://www.apple.com/library/test/success.html"
-  #   interval: 300
+  #   url: "http://cp.cloudflare.com/generate_204"
+  #   expected-status: "204"
+  #   interval: 90
+  #   timeout: 4000
   #   proxies: # 👈 显式指定故障降级优先级（自上而下逐个检测，首个健康者生效）
   #     - "⚡ 良心专线 自动择优" # 第一优先
   #     - "⚡ TNT专线 自动择优"  # 第二优先
