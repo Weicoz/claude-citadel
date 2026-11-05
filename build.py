@@ -493,8 +493,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         airport_select_groups.append({
             "name": select_name,
             "type": "select",
-            "use": [pid],
-            "proxies": [opt_name]
+            "use": [pid]
         })
 
     # 从 diy_groups 提取自定义机场/测速组与专网分流组

@@ -116,10 +116,8 @@ diy_groups: []
   #   timeout: 4000
   #   tolerance: 100
   #
-  # - name: "✈️ 独立机场" # 第四个示例：专属机场选择组 (自动挂载进「🔀 中转节点」供日常选路)
+  # - name: "✈️ 独立机场" # 第四个示例：专属机场自选节点组 (纯自选具体单节点，不混入择优组)
   #   type: select
-  #   proxies:
-  #     - "⚡ 独立机场 自动择优"
   #   filter: "(?i)Amy"
   #
   # - name: "🛟 Fallback" # 第五个示例：自定义故障转移 (Fallback) 顺序与置顶规则

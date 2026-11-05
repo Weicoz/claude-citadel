@@ -368,6 +368,11 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(g_auto["expected-status"], "204")
         self.assertEqual(g_auto["tolerance"], 100)
 
+        # 自选节点组校验：不包含自动择优组，纯净展示单节点
+        g_select = groups["❤️ 主用机场"]
+        self.assertNotIn("proxies", g_select)
+        self.assertEqual(g_select["use"], [list(providers.keys())[0]])
+
 
 if __name__ == "__main__":
     unittest.main()
