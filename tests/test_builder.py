@@ -530,13 +530,33 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         empty_loon = build_ini_based_client(self.loon_tpl, {}, "loon")
         self.assertNotIn("[Remote Rule]", empty_loon, "无自定义规则时残留空段")
 
+    def test_network_overrides_and_cn_domains(self):
+        """profile 的 network 覆盖生效；Clash 使用 MRS 版国内域名规则集。"""
+        profile = {
+            "network": {
+                "tun_exclude_address": ["203.0.113.7/32"],
+                "fake_ip_filter_extra": ["+.example-mesh.test"],
+            }
+        }
+        clash = build_clash_stash(self.clash_tpl, profile, "clash")
+        self.assertEqual(clash["tun"]["route-exclude-address"], ["203.0.113.7/32"])
+        self.assertIn("+.example-mesh.test", clash["dns"]["fake-ip-filter"])
+
+        rp = clash["rule-providers"]["cn-domains"]
+        self.assertEqual(rp["format"], "mrs")
+        self.assertEqual(rp["behavior"], "domain")
+        self.assertIn("RULE-SET,cn-domains,DIRECT", clash["rules"])
+
     def test_cross_client_hardening(self):
         """各端都必须具备等价的防泄漏加固项。"""
         clash = build_clash_stash(self.clash_tpl, {}, "clash")
         stash = build_clash_stash(self.stash_tpl, {}, "stash")
         for cfg, label in ((clash, "clash"), (stash, "stash")):
-            for rule in ("DST-PORT,3478,REJECT", "DST-PORT,19302,REJECT"):
-                self.assertIn(rule, cfg["rules"], f"{label} 缺少 STUN 拦截规则")
+            # 不得拦截 STUN 端口，避免影响通话与游戏语音
+            self.assertFalse(
+                any(r.startswith("DST-PORT,3478,REJECT") for r in cfg["rules"]),
+                f"{label} 不应拦截 STUN 端口",
+            )
             self.assertTrue(cfg["tun"]["enable"], f"{label} TUN 未启用")
             self.assertTrue(cfg["tun"]["auto-route"], f"{label} 未接管全部路由")
             self.assertTrue(cfg["tun"]["strict-route"], f"{label} 未启用严格路由")

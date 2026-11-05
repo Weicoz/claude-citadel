@@ -149,10 +149,6 @@ proxy-groups:
   filter: (?i)台|tw|taiwan
   proxies: []
 rules:
-# ---- 防泄漏：拒绝 STUN/TURN 标准端口，避免 WebRTC 暴露真实公网 IP ----
-- DST-PORT,3478,REJECT
-- DST-PORT,19302,REJECT
-- DST-PORT,19305,REJECT
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
@@ -172,6 +168,8 @@ rules:
 - DOMAIN-SUFFIX,local,DIRECT
 - IP-CIDR,0.0.0.0/8,DIRECT,no-resolve
 - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+- IP-CIDR,169.254.0.0/16,DIRECT,no-resolve
 - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
 - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
 - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve

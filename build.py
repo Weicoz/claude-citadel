@@ -362,6 +362,18 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     claude_cfg = profile_data.get("claude_exits", {}) or {}
     relays_cfg = profile_data.get("relays", {}) or {}
     custom_rules = profile_data.get("custom_rules", {}) or {}
+    # 网络层覆盖：TUN 排除地址与 fake-ip 白名单由 profile 提供，避免把私有地址写进仓库
+    net_cfg = profile_data.get("network", {}) or {}
+    if net_cfg.get("tun_exclude_address"):
+        config.setdefault("tun", {})["route-exclude-address"] = list(net_cfg["tun_exclude_address"])
+    extra_fake_ip = net_cfg.get("fake_ip_filter_extra") or []
+    if extra_fake_ip:
+        dns_cfg = config.setdefault("dns", {})
+        filters = list(dns_cfg.get("fake-ip-filter") or [])
+        for item in extra_fake_ip:
+            if item not in filters:
+                filters.append(item)
+        dns_cfg["fake-ip-filter"] = filters
 
     use_relay_chain = claude_cfg.get("use_relay_chain", False)
     claude_custom = claude_cfg.get("custom_proxies", []) or []
