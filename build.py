@@ -489,11 +489,20 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     custom_auto_groups = []
     custom_select_groups = []
     custom_routing_groups = []
+    custom_fallback_def = None
+    custom_relay_def = None
 
     for g_def in diy_groups:
         g_name = g_def.get("name")
         if not g_name:
             continue
+        if g_name in ["🛟 Fallback", "Fallback"]:
+            custom_fallback_def = g_def
+            continue
+        if g_name in ["🔀 中转节点"]:
+            custom_relay_def = g_def
+            continue
+
         g_type = g_def.get("type", "select")
         has_rules = bool(g_def.get("rules")) or bool(g_def.get("remote_rulesets"))
 
@@ -532,14 +541,16 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             custom_routing_groups.append(grp_dict)
 
     relay_proxies_summary = ["⚡ 自动择优", "🛟 Fallback"]
-    for g in custom_auto_groups:
-        relay_proxies_summary.append(g["name"])
-    for g in custom_select_groups:
-        relay_proxies_summary.append(g["name"])
     for s in relay_subs:
         name = s.get("name", "")
         emoji = s.get("emoji", "✈️")
         relay_proxies_summary.extend([f"⚡ {name} 自动择优", f"{emoji} {name}"])
+    for g in custom_auto_groups:
+        if g["name"] not in relay_proxies_summary:
+            relay_proxies_summary.append(g["name"])
+    for g in custom_select_groups:
+        if g["name"] not in relay_proxies_summary:
+            relay_proxies_summary.append(g["name"])
     relay_proxies_summary.extend(relay_custom_names)
 
     groups = config.get("proxy-groups", [])
@@ -567,9 +578,25 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.append(g)
 
         elif g_name == "🔀 中转节点":
-            if relay_provider_ids:
-                g["use"] = relay_provider_ids
-            g["proxies"] = relay_proxies_summary
+            if custom_relay_def:
+                if "proxies" in custom_relay_def:
+                    r_proxies = []
+                    for p in custom_relay_def["proxies"]:
+                        if isinstance(p, dict) and "name" in p:
+                            r_proxies.append(p["name"])
+                        elif isinstance(p, str):
+                            r_proxies.append(p)
+                    g["proxies"] = r_proxies
+                else:
+                    g["proxies"] = relay_proxies_summary
+                if "use" in custom_relay_def:
+                    g["use"] = custom_relay_def["use"]
+                elif "use" in g and not custom_relay_def.get("use") and not relay_provider_ids:
+                    del g["use"]
+            else:
+                if relay_provider_ids:
+                    g["use"] = relay_provider_ids
+                g["proxies"] = relay_proxies_summary
             new_groups.append(g)
 
         elif g_name == "⚡ 自动择优":
@@ -581,9 +608,32 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.extend(custom_auto_groups)
 
         elif g_name == "🛟 Fallback":
-            if relay_provider_ids:
-                g["use"] = relay_provider_ids
-            g["proxies"] = relay_custom_names.copy()
+            if custom_fallback_def:
+                if "proxies" in custom_fallback_def:
+                    fb_proxies = []
+                    for p in custom_fallback_def["proxies"]:
+                        if isinstance(p, dict) and "name" in p:
+                            fb_proxies.append(p["name"])
+                        elif isinstance(p, str):
+                            fb_proxies.append(p)
+                    g["proxies"] = fb_proxies
+                elif relay_custom_names:
+                    g["proxies"] = relay_custom_names.copy()
+
+                if "use" in custom_fallback_def:
+                    g["use"] = custom_fallback_def["use"]
+                elif not custom_fallback_def.get("proxies") and relay_provider_ids:
+                    g["use"] = relay_provider_ids
+                elif "use" in g and not custom_fallback_def.get("use"):
+                    del g["use"]
+
+                for k in ["url", "interval", "tolerance", "filter"]:
+                    if k in custom_fallback_def:
+                        g[k] = custom_fallback_def[k]
+            else:
+                if relay_provider_ids:
+                    g["use"] = relay_provider_ids
+                g["proxies"] = relay_custom_names.copy()
             new_groups.append(g)
 
         elif g_name == "🎮 Steam":
@@ -775,9 +825,30 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
 
     # 动态插入 DIY 自定义策略组：完全由用户自主定义组名、独立节点与专属规则
     if diy_groups:
+        custom_fallback_def = None
+        for g_def in diy_groups:
+            if g_def.get("name") in ["🛟 Fallback", "Fallback"]:
+                custom_fallback_def = g_def
+                break
+
+        if custom_fallback_def:
+            fb_nodes = []
+            for p in custom_fallback_def.get("proxies", []) or []:
+                if isinstance(p, dict) and "name" in p:
+                    fb_nodes.append(p["name"])
+                elif isinstance(p, str):
+                    fb_nodes.append(p)
+            if fb_nodes:
+                if client_type == "surge":
+                    content = content.replace("🛟 Fallback = fallback, url=", f"🛟 Fallback = fallback, {', '.join(fb_nodes)}, url=")
+                elif client_type in ["shadowrocket", "loon"]:
+                    content = content.replace("🛟 Fallback = fallback,url=", f"🛟 Fallback = fallback,{','.join(fb_nodes)},url=")
+                elif client_type == "qx":
+                    content = content.replace("fallback=🛟 Fallback, server-tag-regex=.*,", f"fallback=🛟 Fallback, {', '.join(fb_nodes)},")
+
         for g_def in diy_groups:
             g_name = g_def.get("name")
-            if not g_name:
+            if not g_name or g_name in ["🛟 Fallback", "Fallback", "🔀 中转节点"]:
                 continue
             g_type = g_def.get("type", "select")
             has_rules = bool(g_def.get("rules")) or bool(g_def.get("remote_rulesets"))

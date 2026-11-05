@@ -280,6 +280,59 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertNotIn("🇺🇸 专属出口C (显式直连) =", loon_out.split("[Proxy Chain]")[1].split("[Proxy Group]")[0])
         self.assertIn("🇺🇸 专属出口D (继承全局中转) = 🔀 中转节点", loon_out)
 
+    def test_custom_fallback_and_group_order(self):
+        """测试在 diy_groups 中自定义 🛟 Fallback 策略组的节点优先级顺序与去重。"""
+        profile = {
+            "relays": {
+                "subscriptions": [
+                    {"name": "良心专线", "emoji": "❤️", "url": "https://sub.liangxin.com/sub"},
+                    {"name": "TNT专线", "emoji": "🚀", "url": "https://sub.tnt.com/sub"},
+                    {"name": "猫咪云", "emoji": "🐱", "url": "https://sub.miaona.com/sub"},
+                ]
+            },
+            "diy_groups": [
+                {
+                    "name": "⚡ Amy 自动择优",
+                    "type": "url-test",
+                    "proxies": ["Amy 01", "Amy 02"]
+                },
+                {
+                    "name": "🛟 Fallback",
+                    "type": "fallback",
+                    "proxies": [
+                        "⚡ 良心专线 自动择优",
+                        "⚡ TNT专线 自动择优",
+                        "⚡ 猫咪云 自动择优",
+                        "⚡ Amy 自动择优"
+                    ]
+                }
+            ]
+        }
+
+        # 1. Clash 验证
+        clash_cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        groups = {g["name"]: g for g in clash_cfg["proxy-groups"]}
+        self.assertIn("🛟 Fallback", groups)
+        fb_group = groups["🛟 Fallback"]
+        self.assertEqual(fb_group["proxies"], [
+            "⚡ 良心专线 自动择优",
+            "⚡ TNT专线 自动择优",
+            "⚡ 猫咪云 自动择优",
+            "⚡ Amy 自动择优"
+        ])
+        self.assertNotIn("use", fb_group)
+        # 验证 🛟 Fallback 没有被重复添加
+        all_fb = [g for g in clash_cfg["proxy-groups"] if g["name"] == "🛟 Fallback"]
+        self.assertEqual(len(all_fb), 1)
+
+        # 2. Surge 验证
+        surge_out = build_ini_based_client(self.surge_tpl, profile, "surge")
+        self.assertIn("🛟 Fallback = fallback, ⚡ 良心专线 自动择优, ⚡ TNT专线 自动择优, ⚡ 猫咪云 自动择优, ⚡ Amy 自动择优, url=", surge_out)
+
+        # 3. Shadowrocket 验证
+        sr_out = build_ini_based_client(self.shadowrocket_tpl, profile, "shadowrocket")
+        self.assertIn("🛟 Fallback = fallback,⚡ 良心专线 自动择优,⚡ TNT专线 自动择优,⚡ 猫咪云 自动择优,⚡ Amy 自动择优,url=", sr_out)
+
 
 if __name__ == "__main__":
     unittest.main()
