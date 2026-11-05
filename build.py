@@ -366,6 +366,13 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     net_cfg = profile_data.get("network", {}) or {}
     if net_cfg.get("tun_exclude_address"):
         config.setdefault("tun", {})["route-exclude-address"] = list(net_cfg["tun_exclude_address"])
+    extra_ns_policy = net_cfg.get("nameserver_policy_extra") or {}
+    if isinstance(extra_ns_policy, dict) and extra_ns_policy:
+        policy = dict((config.setdefault("dns", {}) or {}).get("nameserver-policy") or {})
+        for domain, servers in extra_ns_policy.items():
+            if isinstance(domain, str) and isinstance(servers, list) and servers:
+                policy[domain] = [str(x) for x in servers]
+        config["dns"]["nameserver-policy"] = policy
     extra_fake_ip = net_cfg.get("fake_ip_filter_extra") or []
     if extra_fake_ip:
         dns_cfg = config.setdefault("dns", {})

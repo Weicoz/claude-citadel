@@ -203,12 +203,19 @@ rules:
 - RULE-SET,claude-citadel-apple,🍎 Apple
 - RULE-SET,claude-citadel-steam,🎮 Steam
 - RULE-SET,claude-citadel-discord,🌐 海外服务
+- PROCESS-NAME,Discord.exe,🌐 海外服务
+- PROCESS-NAME-REGEX,^Discord( Helper.*)?$,🌐 海外服务
 - RULE-SET,claude-citadel-microsoft,🌐 海外服务
+- DOMAIN-SUFFIX,gmail.com,🌐 海外服务
+- DOMAIN-SUFFIX,googlemail.com,🌐 海外服务
+- DOMAIN,mail.google.com,🌐 海外服务
 - RULE-SET,claude-citadel-mail,📧 邮件收件
 - RULE-SET,claude-citadel-gfw,🌐 海外服务
 - RULE-SET,claude-citadel-direct,DIRECT
 - RULE-SET,cn-domains,DIRECT
 - RULE-SET,claude-citadel-cn-ip,DIRECT,no-resolve
+- DST-PORT,993,📧 邮件收件
+- DST-PORT,995,📧 邮件收件
 - GEOIP,CN,DIRECT
 - MATCH,🇺🇸 海外出口
 rule-providers:

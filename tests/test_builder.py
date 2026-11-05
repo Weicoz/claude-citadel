@@ -542,6 +542,25 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(clash["tun"]["route-exclude-address"], ["203.0.113.7/32"])
         self.assertIn("+.example-mesh.test", clash["dns"]["fake-ip-filter"])
 
+        profile["network"]["nameserver_policy_extra"] = {
+            "+.example.test": ["https://223.5.5.5/dns-query"]
+        }
+        clash2 = build_clash_stash(self.clash_tpl, profile, "clash")
+        self.assertEqual(
+            clash2["dns"]["nameserver-policy"]["+.example.test"],
+            ["https://223.5.5.5/dns-query"],
+        )
+
+        # 邮件与 Discord 的显式规则、IMAP 端口定向
+        for rule in (
+            "DOMAIN-SUFFIX,gmail.com,🌐 海外服务",
+            "DOMAIN,mail.google.com,🌐 海外服务",
+            "PROCESS-NAME,Discord.exe,🌐 海外服务",
+            "DST-PORT,993,📧 邮件收件",
+            "DST-PORT,995,📧 邮件收件",
+        ):
+            self.assertIn(rule, clash["rules"], f"缺少规则 {rule}")
+
         rp = clash["rule-providers"]["cn-domains"]
         self.assertEqual(rp["format"], "mrs")
         self.assertEqual(rp["behavior"], "domain")
