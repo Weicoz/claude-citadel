@@ -530,6 +530,20 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         empty_loon = build_ini_based_client(self.loon_tpl, {}, "loon")
         self.assertNotIn("[Remote Rule]", empty_loon, "无自定义规则时残留空段")
 
+    def test_shadowrocket_hardening(self):
+        """Shadowrocket 模板必须包含移动端防泄漏加固参数。"""
+        text = build_ini_based_client(self.shadowrocket_tpl, {}, "shadowrocket")
+        for line in (
+            "compatibility-mode = 3",
+            "include-all-networks = true",
+            "include-local-networks = false",
+            "hijack-dns = *:53",
+            "stun-response-ip = 1.1.1.1",
+            "stun-response-ipv6 = ::1",
+            "udp-policy-not-supported-behaviour = REJECT",
+        ):
+            self.assertIn(line, text, f"Shadowrocket 缺少 {line}")
+
     def test_ini_cncidr_and_validator(self):
         """ini 四端使用 Surge 格式的 cn CIDR；内核校验失败时必须返回 False。"""
         for tpl, client in (

@@ -275,6 +275,36 @@ custom_rules:
 > [!NOTE]
 > Surge / Loon / Shadowrocket / Quantumult X 的 `RULE-SET` 由客户端自行下载，无法像 Clash 那样在配置里指定下载代理。若所在网络无法直连 GitHub，请把模板中的 `raw.githubusercontent.com` 规则集地址替换为可访问的镜像。
 
+### 7. 移动端 IP 防泄露加固
+
+Shadowrocket 的加固参数已写入 `shadowrocket.conf` 的 `[General]` 段（隐式参数，优先级高于 App 内同名开关）：
+
+| 配置项 | 值 | 作用 |
+| :--- | :--- | :--- |
+| `compatibility-mode` | `3` | TUN Only，全部请求经 TUN，等价于 设置 → 代理 → 代理类型 → None |
+| `include-all-networks` | `true` | 所有网络进入 TUN |
+| `include-local-networks` | `false` | 本地网络不进 TUN，不影响局域网设备 |
+| `tun-excluded-routes` | 回环 / 链路本地 / 组播 / 广播 | 仅旁路这些网段；`10/8`、`172.16/12`、`192.168/16` 保留在 TUN 内，交由 IP-CIDR 规则决定 |
+| `hijack-dns` | `*:53` | 劫持硬编码 DNS 查询 |
+| `stun-response-ip` | `1.1.1.1` | STUN 返回固定地址，防止 WebRTC 暴露真实公网 IP |
+| `stun-response-ipv6` | `::1` | 同上（IPv6） |
+| `udp-policy-not-supported-behaviour` | `REJECT` | 节点不支持 UDP 时拒绝，而非直连泄漏 |
+| `icmp-auto-reply` | `true` | ping 自动回复，减少探测 |
+
+仍需在 App 内手动设置（配置无法覆盖）：
+
+| 设置路径 | 值 | 原因 |
+| :--- | :--- | :--- |
+| 首页 → 全局路由 | 配置 | 决定按规则分流还是全局代理 |
+| 设置 → UDP → 启用转发 | 开启 | 订阅与节点级 UDP 开关属于客户端状态 |
+| 首页 → 订阅 / 节点 → UDP 转发 | 开启 | 同上，且节点必须本身支持 UDP |
+
+> [!IMPORTANT]
+> UDP 转发能否生效取决于节点是否支持 UDP。节点不支持时，UDP 流量会被 `REJECT` 或回退直连，STUN 类探测仍可能看到真实出口 IP。
+
+> [!NOTE]
+> Surge / Loon / Shadowrocket / Quantumult X 的 `RULE-SET` 由客户端自行下载，无法像 Clash 那样在配置里指定下载代理。若所在网络无法直连 GitHub，请把模板中的 `raw.githubusercontent.com` 规则集地址替换为可访问的镜像。
+
 ### 7. 移动端 IP 防泄露加固（客户端手动设置）
 
 以下项目属于客户端 UI 开关，**无法写入 `.conf` 配置文件**，导入后需在客户端内手动设置一次：
