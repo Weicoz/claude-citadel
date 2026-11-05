@@ -747,8 +747,9 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             for m in extra_members:
                 if m not in members:
                     members.append(m)
-            # DIRECT 统一放到末尾，作为兜底选项而非默认项
-            if "DIRECT" in members:
+            # DIRECT 统一放到末尾，作为兜底选项而非默认项；
+            # 🔗 直连改道 例外，保持 DIRECT 为默认项
+            if "DIRECT" in members and g.get("name") != "🔗 直连改道":
                 members.remove("DIRECT")
                 members.append("DIRECT")
             g["proxies"] = members

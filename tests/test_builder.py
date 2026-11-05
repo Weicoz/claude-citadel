@@ -546,7 +546,9 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                 "⚡ 机场B 自动择优", "❤️ 机场B",
             ):
                 self.assertIn(expected, members, f"{name} 缺少 {expected}")
-            if "DIRECT" in members:
+            if name == "🔗 直连改道":
+                self.assertEqual(members[0], "DIRECT", "直连改道应默认 DIRECT")
+            elif "DIRECT" in members:
                 self.assertEqual(members[-1], "DIRECT", f"{name} 的 DIRECT 应位于末尾")
 
     def test_network_overrides_and_cn_domains(self):
