@@ -213,6 +213,73 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertIn("🕸️ 组网访问 = select, DIRECT, EasyTier SOCKS5", surge_out)
         self.assertIn("🍎 Apple = select, DIRECT, 🔀 中转节点, ⚡ 自动择优, 🇭🇰 香港节点, 🇯🇵 日本节点, 🇺🇸 美国节点, 🇸🇬 新加坡节点, 🇹🇼 台湾节点", surge_out)
 
+    def test_per_node_dialer_proxy_and_custom_hop(self):
+        """测试节点级独立代理链开关，以及显式指定经过特定前置中转节点/策略组。"""
+        profile = {
+            "claude_exits": {
+                "use_relay_chain": True,  # 全局虽然开启，但允许节点级独立覆盖或指定
+                "custom_proxies": [
+                    {
+                        "name": "🇺🇸 专属出口A (指定走Amy择优)",
+                        "type": "socks5",
+                        "server": "198.51.100.1",
+                        "port": 1080,
+                        "dialer-proxy": "⚡ Amy 自动择优"  # 👈 显式指定经过特定组
+                    },
+                    {
+                        "name": "🇺🇸 专属出口B (指定走具体节点)",
+                        "type": "socks5",
+                        "server": "198.51.100.2",
+                        "port": 1080,
+                        "relay": "[Amy] 🇭🇰 香港 01"  # 👈 友好别名 relay
+                    },
+                    {
+                        "name": "🇺🇸 专属出口C (显式直连)",
+                        "type": "socks5",
+                        "server": "198.51.100.3",
+                        "port": 1080,
+                        "dialer-proxy": False  # 👈 覆盖全局开启，强制直连
+                    },
+                    {
+                        "name": "🇺🇸 专属出口D (继承全局中转)",
+                        "type": "socks5",
+                        "server": "198.51.100.4",
+                        "port": 1080
+                    }
+                ]
+            }
+        }
+
+        # 1. Clash 验证
+        clash_cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        clash_proxies = {p["name"]: p for p in clash_cfg["proxies"]}
+
+        self.assertEqual(clash_proxies["🇺🇸 专属出口A (指定走Amy择优)"].get("dialer-proxy"), "⚡ Amy 自动择优")
+        self.assertEqual(clash_proxies["🇺🇸 专属出口B (指定走具体节点)"].get("dialer-proxy"), "[Amy] 🇭🇰 香港 01")
+        self.assertNotIn("dialer-proxy", clash_proxies["🇺🇸 专属出口C (显式直连)"])
+        self.assertEqual(clash_proxies["🇺🇸 专属出口D (继承全局中转)"].get("dialer-proxy"), "🔀 中转节点")
+
+        # 2. Surge 验证 (underlying-proxy)
+        surge_out = build_ini_based_client(self.surge_tpl, profile, "surge")
+        self.assertIn('🇺🇸 专属出口A (指定走Amy择优) = socks5, 198.51.100.1, 1080, underlying-proxy="⚡ Amy 自动择优"', surge_out)
+        self.assertIn('🇺🇸 专属出口B (指定走具体节点) = socks5, 198.51.100.2, 1080, underlying-proxy="[Amy] 🇭🇰 香港 01"', surge_out)
+        self.assertIn('🇺🇸 专属出口C (显式直连) = socks5, 198.51.100.3, 1080\n', surge_out)
+        self.assertIn('🇺🇸 专属出口D (继承全局中转) = socks5, 198.51.100.4, 1080, underlying-proxy="🔀 中转节点"', surge_out)
+
+        # 3. Shadowrocket 验证 (chain)
+        sr_out = build_ini_based_client(self.shadowrocket_tpl, profile, "shadowrocket")
+        self.assertIn('🇺🇸 专属出口A (指定走Amy择优) = socks5, 198.51.100.1, 1080, chain="⚡ Amy 自动择优"', sr_out)
+        self.assertIn('🇺🇸 专属出口B (指定走具体节点) = socks5, 198.51.100.2, 1080, chain="[Amy] 🇭🇰 香港 01"', sr_out)
+        self.assertIn('🇺🇸 专属出口C (显式直连) = socks5, 198.51.100.3, 1080\n', sr_out)
+        self.assertIn('🇺🇸 专属出口D (继承全局中转) = socks5, 198.51.100.4, 1080, chain="🔀 中转节点"', sr_out)
+
+        # 4. Loon 验证 ([Proxy Chain])
+        loon_out = build_ini_based_client(self.loon_tpl, profile, "loon")
+        self.assertIn("🇺🇸 专属出口A (指定走Amy择优) = ⚡ Amy 自动择优", loon_out)
+        self.assertIn("🇺🇸 专属出口B (指定走具体节点) = [Amy] 🇭🇰 香港 01", loon_out)
+        self.assertNotIn("🇺🇸 专属出口C (显式直连) =", loon_out.split("[Proxy Chain]")[1].split("[Proxy Group]")[0])
+        self.assertIn("🇺🇸 专属出口D (继承全局中转) = 🔀 中转节点", loon_out)
+
 
 if __name__ == "__main__":
     unittest.main()

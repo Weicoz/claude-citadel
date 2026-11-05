@@ -7,22 +7,38 @@
 # 1. Claude 专用出口 (独立出口，专供 Claude / Anthropic 分流，日常流量不走这里)
 # ------------------------------------------------------------------------------
 claude_exits:
-  # 是否强制经由「🔀 中转节点」代理链拨号：
-  # - true: 自动为 Claude 节点追加 dialer-proxy / underlying-proxy / chain（适合国内直连不通的住宅 IP / VPS）
-  # - false: 直接直连拨号（适合原生可直连的住宅 IP 或专线）
+  # 代理链前置中转开关与规则说明：
+  # 本系统支持【节点级独立配置代理链】，每个节点都可以自主选择直连或经过指定中转！
+  #
+  # 支持在任何节点 (custom_proxies) 上配置以下字段 (别名: relay / dialer-proxy / underlying-proxy / chain):
+  # - dialer-proxy: "⚡ Amy 自动择优"  (指定先经过该特定策略组或节点拨号，再到此出口)
+  # - dialer-proxy: "[Amy] 🇭🇰 香港 01" (指定先经过该具体节点中转)
+  # - dialer-proxy: "🔀 中转节点"      (指定走通用中转池)
+  # - dialer-proxy: false / DIRECT    (强制该节点直连拨号，不走代理链)
+  #
+  # 全局默认开关 (可选兜底配置)：若节点自身未填写 dialer-proxy，则以 use_relay_chain 为准
   use_relay_chain: true
 
   # 形态 A：手动配置节点 (如自建 VPS / 独立住宅 IP / 特殊代理出口，地区可自定义)
   # 支持 socks5, http, ss, trojan, vmess 等所有主流协议
   custom_proxies:
-    - name: "🇺🇸 专属出口 (自建VPS/住宅IP)"
+    - name: "🇺🇸 专属出口 (经Amy自动择优中转)"
       type: socks5
       server: 198.51.100.1
       port: 1080
-      # username: "user"
-      # password: "password"
-      # 单节点覆盖开关：指定 dialer-proxy 或留空
-      # dialer-proxy: "🔀 中转节点"
+      dialer-proxy: "⚡ Amy 自动择优" # 👈 指定先经过 Amy 自动择优，再到达此出口节点
+
+    - name: "🇺🇸 专属出口 (经指定香港节点中转)"
+      type: socks5
+      server: 198.51.100.2
+      port: 1080
+      dialer-proxy: "[Amy] 🇭🇰 香港 01" # 👈 指定先经过该固定节点中转
+
+    - name: "🇺🇸 专属出口 (直连住宅IP)"
+      type: socks5
+      server: 198.51.100.3
+      port: 1080
+      dialer-proxy: false # 👈 节点级独立开关：该节点强制直连拨号，不走任何中转
 
   # 形态 B：专用订阅 (如果有专门解锁 Claude 的独享专线机场/订阅)
   subscriptions: []

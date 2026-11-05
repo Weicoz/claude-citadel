@@ -183,6 +183,40 @@ def format_qx_rule(raw_rule, default_target):
         target = "reject"
     return f"{qx_type}, {pattern}, {target}"
 
+
+def resolve_node_dialer_proxy(proxy_dict, default_chain=False):
+    """
+    解析单个节点的代理链前置中转 (支持 dialer-proxy / relay / underlying-proxy / chain / via)。
+    支持:
+    - 具体的节点名或策略组名 (字符串): 如 "⚡ Amy 自动择优", "🔀 中转节点", "[Amy] 🇭🇰 香港 01", "🇯🇵 日本节点" 等
+    - 布尔值 True: 启用中转，默认走 "🔀 中转节点"
+    - 布尔值 False / None / "" / "DIRECT": 显式直连拨号，不走代理链
+    - 未配置时: 遵循传入的 default_chain (True 则走 "🔀 中转节点"，否则直连)
+    """
+    if not isinstance(proxy_dict, dict):
+        return None
+
+    # 支持的字段名优先级: dialer-proxy > relay > underlying-proxy > underlying_proxy > chain > via
+    val = None
+    for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+        if key in proxy_dict:
+            val = proxy_dict[key]
+            break
+
+    if val is not None:
+        if isinstance(val, bool):
+            return "🔀 中转节点" if val else None
+        if isinstance(val, str):
+            val_clean = val.strip()
+            if not val_clean or val_clean.upper() in ["DIRECT", "FALSE", "NONE", "NO", "OFF"]:
+                return None
+            if val_clean.upper() in ["TRUE", "YES", "ON"]:
+                return "🔀 中转节点"
+            return val_clean
+
+    return "🔀 中转节点" if default_chain else None
+
+
 def extract_diy_groups(profile_data):
     """提取用户自定义 DIY 策略组、独立节点与专属规则。"""
     diy_groups = profile_data.get("diy_groups", []) or []
@@ -314,19 +348,32 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     claude_custom_names = []
     relay_custom_names = []
 
-    # 处理 Claude 节点代理链
+    # 处理 Claude 节点代理链 (支持节点级独立代理链与自定义前置中转)
     for p in claude_custom:
         if isinstance(p, dict) and "name" in p:
             p_copy = p.copy()
-            if use_relay_chain and "dialer-proxy" not in p_copy:
-                p_copy["dialer-proxy"] = "🔀 中转节点"
+            hop = resolve_node_dialer_proxy(p_copy, default_chain=use_relay_chain)
+            for k in ["relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+                p_copy.pop(k, None)
+            if hop:
+                p_copy["dialer-proxy"] = hop
+            else:
+                p_copy.pop("dialer-proxy", None)
             all_proxies.append(p_copy)
             claude_custom_names.append(p_copy["name"])
 
     for p in relay_custom:
         if isinstance(p, dict) and "name" in p:
-            all_proxies.append(p)
-            relay_custom_names.append(p["name"])
+            p_copy = p.copy()
+            hop = resolve_node_dialer_proxy(p_copy, default_chain=False)
+            for k in ["relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+                p_copy.pop(k, None)
+            if hop:
+                p_copy["dialer-proxy"] = hop
+            else:
+                p_copy.pop("dialer-proxy", None)
+            all_proxies.append(p_copy)
+            relay_custom_names.append(p_copy["name"])
 
     # 处理 DIY 自定义策略组中的独立专属节点 (不参与日常中转测速，同名节点自动去重)
     diy_groups = extract_diy_groups(profile_data)
@@ -334,8 +381,16 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     for g_def in diy_groups:
         for p in g_def.get("proxies", []) or []:
             if isinstance(p, dict) and "name" in p and p["name"] not in seen_proxy_names:
-                all_proxies.append(p)
-                seen_proxy_names.add(p["name"])
+                p_copy = p.copy()
+                hop = resolve_node_dialer_proxy(p_copy, default_chain=False)
+                for k in ["relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+                    p_copy.pop(k, None)
+                if hop:
+                    p_copy["dialer-proxy"] = hop
+                else:
+                    p_copy.pop("dialer-proxy", None)
+                all_proxies.append(p_copy)
+                seen_proxy_names.add(p_copy["name"])
 
     config["proxies"] = all_proxies
 
@@ -587,6 +642,7 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
     proxy_lines = []
     claude_names = []
     relay_names = []
+    claude_chained_map = {}
 
     for p in claude_custom:
         name = p.get("name", "Claude_Proxy")
@@ -595,13 +651,15 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         port = p.get("port", 1080)
         claude_names.append(name)
 
-        is_chained = bool(p.get("dialer-proxy")) if "dialer-proxy" in p and p.get("dialer-proxy") is not None else use_relay_chain
+        hop = resolve_node_dialer_proxy(p, default_chain=use_relay_chain)
+        if hop:
+            claude_chained_map[name] = hop
 
         if client_type == "surge":
-            chain_opt = ', underlying-proxy="🔀 中转节点"' if is_chained else ""
+            chain_opt = f', underlying-proxy="{hop}"' if hop else ""
             proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt}")
         elif client_type == "shadowrocket":
-            chain_opt = ', chain="🔀 中转节点"' if is_chained else ""
+            chain_opt = f', chain="{hop}"' if hop else ""
             proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt}")
         elif client_type == "loon":
             proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
@@ -614,11 +672,19 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         server = p.get("server", "127.0.0.1")
         port = p.get("port", 8388)
 
+        hop = resolve_node_dialer_proxy(p, default_chain=False)
+        chain_opt_surge = f', underlying-proxy="{hop}"' if hop else ""
+        chain_opt_sr = f', chain="{hop}"' if hop else ""
+
         # 协议兼容性过滤：跳过 INI 类客户端不支持的现代核心专有协议 (如 AnyTLS)
-        if client_type in ["surge", "shadowrocket"]:
+        if client_type == "surge":
             if p_type in ["ss", "socks5", "http", "vmess", "trojan", "snell", "wireguard", "hysteria2"]:
                 relay_names.append(name)
-                proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt_surge}")
+        elif client_type == "shadowrocket":
+            if p_type in ["ss", "socks5", "http", "vmess", "trojan", "snell", "wireguard", "hysteria2"]:
+                relay_names.append(name)
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt_sr}")
         elif client_type == "loon":
             if p_type in ["ss", "socks5", "http", "vmess", "trojan", "wireguard", "hysteria2"]:
                 relay_names.append(name)
@@ -641,8 +707,13 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
             p_type = p.get("type", "socks5").lower()
             server = p.get("server", "127.0.0.1")
             port = p.get("port", 1080)
-            if client_type in ["surge", "shadowrocket"]:
-                proxy_lines.append(f"{name} = {p_type}, {server}, {port}")
+            hop = resolve_node_dialer_proxy(p, default_chain=False)
+            chain_opt_surge = f', underlying-proxy="{hop}"' if hop else ""
+            chain_opt_sr = f', chain="{hop}"' if hop else ""
+            if client_type == "surge":
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt_surge}")
+            elif client_type == "shadowrocket":
+                proxy_lines.append(f"{name} = {p_type}, {server}, {port}{chain_opt_sr}")
             elif client_type == "loon":
                 proxy_lines.append(f"{name} = {p_type.capitalize()},{server},{port}")
             elif client_type == "qx":
@@ -660,9 +731,8 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
         content = content.replace("[Remote Proxy]\n", "[Remote Proxy]\n" + "\n".join(remote_lines) + "\n")
         # 填充 Loon 的 [Proxy Chain]
         chain_lines = []
-        if use_relay_chain:
-            for name in claude_names:
-                chain_lines.append(f"{name} = 🔀 中转节点")
+        for name, hop in claude_chained_map.items():
+            chain_lines.append(f"{name} = {hop}")
         chain_block = "[Proxy Chain]\n" + ("\n".join(chain_lines) + "\n" if chain_lines else "")
         content = content.replace("[Proxy Chain]\n", chain_block)
 
