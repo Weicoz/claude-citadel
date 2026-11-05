@@ -530,6 +530,23 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         empty_loon = build_ini_based_client(self.loon_tpl, {}, "loon")
         self.assertNotIn("[Remote Rule]", empty_loon, "无自定义规则时残留空段")
 
+    def test_business_groups_expanded(self):
+        """业务组必须包含全局自动择优、Fallback、各机场自动择优与机场自选组。"""
+        profile = {"relays": {"subscriptions": [
+            {"name": "机场A", "emoji": "✈️", "url": "https://sub.example.com/a"},
+            {"name": "机场B", "emoji": "❤️", "url": "https://sub.example.com/b"},
+        ]}}
+        cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        groups = {g["name"]: g for g in cfg["proxy-groups"]}
+        for name in ("🌐 海外服务", "🤖 OpenAI", "📧 邮件收件", "🍎 Apple", "🔗 直连改道"):
+            members = groups[name]["proxies"]
+            for expected in (
+                "⚡ 自动择优", "🛟 Fallback",
+                "⚡ 机场A 自动择优", "✈️ 机场A",
+                "⚡ 机场B 自动择优", "❤️ 机场B",
+            ):
+                self.assertIn(expected, members, f"{name} 缺少 {expected}")
+
     def test_network_overrides_and_cn_domains(self):
         """profile 的 network 覆盖生效；Clash 使用 MRS 版国内域名规则集。"""
         profile = {

@@ -729,6 +729,26 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.insert(insert_idx, grp)
             insert_idx += 1
 
+    # 业务组统一补齐：全局自动择优、Fallback、各机场自动择优与机场自选组
+    business_group_names = (
+        "🌐 海外服务", "🤖 OpenAI", "🚀 Google AI", "📧 邮件收件",
+        "✈️ Telegram", "🍎 Apple", "🎮 Steam", "🔗 直连改道",
+    )
+    extra_members = ["⚡ 自动择优", "🛟 Fallback"]
+    for ag, sg in zip(airport_auto_groups, airport_select_groups):
+        extra_members.append(ag["name"])
+        extra_members.append(sg["name"])
+    extra_members.extend(ag["name"] for ag in custom_auto_groups)
+    extra_members.extend(sg["name"] for sg in custom_select_groups)
+
+    for g in new_groups:
+        if g.get("name") in business_group_names and g.get("type") == "select":
+            members = list(g.get("proxies") or [])
+            for m in extra_members:
+                if m not in members:
+                    members.append(m)
+            g["proxies"] = members
+
     # 保证每个策略组都合法，无空 use 或空 proxies 导致内核崩溃
     for g in new_groups:
         has_use = bool(g.get("use"))
