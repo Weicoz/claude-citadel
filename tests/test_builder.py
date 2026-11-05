@@ -546,6 +546,8 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                 "⚡ 机场B 自动择优", "❤️ 机场B",
             ):
                 self.assertIn(expected, members, f"{name} 缺少 {expected}")
+            if "DIRECT" in members:
+                self.assertEqual(members[-1], "DIRECT", f"{name} 的 DIRECT 应位于末尾")
 
     def test_network_overrides_and_cn_domains(self):
         """profile 的 network 覆盖生效；Clash 使用 MRS 版国内域名规则集。"""

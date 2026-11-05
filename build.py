@@ -747,6 +747,10 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             for m in extra_members:
                 if m not in members:
                     members.append(m)
+            # DIRECT 统一放到末尾，作为兜底选项而非默认项
+            if "DIRECT" in members:
+                members.remove("DIRECT")
+                members.append("DIRECT")
             g["proxies"] = members
 
     # 保证每个策略组都合法，无空 use 或空 proxies 导致内核崩溃
