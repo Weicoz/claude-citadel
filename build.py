@@ -240,7 +240,7 @@ def extract_diy_groups(profile_data):
     return diy_groups
 
 
-def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
+def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type="clash"):
     """注入用户自定义分流规则到 Clash / Stash。"""
     if not custom_rules and not diy_groups:
         return config
@@ -253,15 +253,17 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
     claude_cfg = custom_rules.get("claude_exit", {}) or {}
     for idx, r_url in enumerate(claude_cfg.get("remote_rulesets", []) or []):
         tag = f"claude-citadel-custom-claude-{idx+1}"
-        rule_providers[tag] = {
+        rp = {
             "type": "http",
             "behavior": "classical",
             "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
             "path": f"./ruleset/{tag}.yaml",
             "url": r_url,
             "interval": 86400,
-            "proxy": "DIRECT"
         }
+        if client_type == "clash":
+            rp["proxy"] = "🔀 中转节点"
+        rule_providers[tag] = rp
         injected_rules.append(f"RULE-SET,{tag},🇺🇸 海外出口")
     for r in claude_cfg.get("rules", []) or []:
         formatted = format_clash_stash_rule(r, "🇺🇸 海外出口")
@@ -272,15 +274,17 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
     direct_cfg = custom_rules.get("direct", {}) or {}
     for idx, r_url in enumerate(direct_cfg.get("remote_rulesets", []) or []):
         tag = f"claude-citadel-custom-direct-{idx+1}"
-        rule_providers[tag] = {
+        rp = {
             "type": "http",
             "behavior": "classical",
             "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
             "path": f"./ruleset/{tag}.yaml",
             "url": r_url,
             "interval": 86400,
-            "proxy": "DIRECT"
         }
+        if client_type == "clash":
+            rp["proxy"] = "🔀 中转节点"
+        rule_providers[tag] = rp
         injected_rules.append(f"RULE-SET,{tag},DIRECT")
     for r in direct_cfg.get("rules", []) or []:
         formatted = format_clash_stash_rule(r, "DIRECT")
@@ -291,15 +295,17 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
     relay_cfg = custom_rules.get("relay", {}) or {}
     for idx, r_url in enumerate(relay_cfg.get("remote_rulesets", []) or []):
         tag = f"claude-citadel-custom-relay-{idx+1}"
-        rule_providers[tag] = {
+        rp = {
             "type": "http",
             "behavior": "classical",
             "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
             "path": f"./ruleset/{tag}.yaml",
             "url": r_url,
             "interval": 86400,
-            "proxy": "DIRECT"
         }
+        if client_type == "clash":
+            rp["proxy"] = "🔀 中转节点"
+        rule_providers[tag] = rp
         injected_rules.append(f"RULE-SET,{tag},🔀 中转节点")
     for r in relay_cfg.get("rules", []) or []:
         formatted = format_clash_stash_rule(r, "🔀 中转节点")
@@ -314,15 +320,17 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None):
         tag_prefix = sanitize_id(g_name) or f"diy_{g_idx+1}"
         for idx, r_url in enumerate(g_def.get("remote_rulesets", []) or []):
             tag = f"claude-citadel-diy-{tag_prefix}-{idx+1}"
-            rule_providers[tag] = {
+            rp = {
                 "type": "http",
                 "behavior": "classical",
                 "format": "yaml" if r_url.endswith((".yaml", ".yml")) else "text",
                 "path": f"./ruleset/{tag}.yaml",
                 "url": r_url,
                 "interval": 86400,
-                "proxy": "DIRECT"
             }
+            if client_type == "clash":
+                rp["proxy"] = "🔀 中转节点"
+            rule_providers[tag] = rp
             injected_rules.append(f"RULE-SET,{tag},{g_name}")
         for r in g_def.get("rules", []) or []:
             formatted = format_clash_stash_rule(r, g_name)
@@ -700,7 +708,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             g["proxies"] = ["DIRECT"]
 
     config["proxy-groups"] = new_groups
-    return apply_custom_rules_clash(config, custom_rules, diy_groups)
+    return apply_custom_rules_clash(config, custom_rules, diy_groups, client_type=client_type)
 
 
 def build_ini_based_client(template_path, profile_data, client_type="surge"):

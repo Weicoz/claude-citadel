@@ -373,6 +373,29 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertNotIn("proxies", g_select)
         self.assertEqual(g_select["use"], [list(providers.keys())[0]])
 
+    def test_rule_providers_proxy_routing(self):
+        """测试 rule-providers 在 Clash 中走中转节点，避免直连 GitHub EOF，且 Stash 不含非法 proxy 字段。"""
+        profile = {
+            "custom_rules": {
+                "claude_exit": {
+                    "remote_rulesets": ["https://raw.githubusercontent.com/test/claude.yaml"]
+                },
+                "direct": {
+                    "remote_rulesets": ["https://raw.githubusercontent.com/test/direct.yaml"]
+                }
+            }
+        }
+        clash_cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        stash_cfg = build_clash_stash(self.stash_tpl, profile, "stash")
+
+        # Clash: 所有 rule-providers 必须走 🔀 中转节点，绝不能是 DIRECT
+        for rp_name, rp in clash_cfg.get("rule-providers", {}).items():
+            self.assertEqual(rp.get("proxy"), "🔀 中转节点", f"{rp_name} proxy 应为 🔀 中转节点")
+
+        # Stash: 绝不能包含 proxy: DIRECT 字段
+        for rp_name, rp in stash_cfg.get("rule-providers", {}).items():
+            self.assertNotIn("proxy", rp, f"Stash {rp_name} 不应包含 proxy 字段")
+
 
 if __name__ == "__main__":
     unittest.main()

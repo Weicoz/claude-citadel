@@ -216,7 +216,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-claude.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/claude.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-direct-supplement:
     type: http
     behavior: classical
@@ -224,7 +224,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-direct-supplement.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_direct_supplement.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-proxy-supplement:
     type: http
     behavior: classical
@@ -232,7 +232,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-proxy-supplement.yaml
     url: https://raw.githubusercontent.com/Weicoz/claude-citadel/main/rules/public_proxy_supplement.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-openai:
     type: http
     behavior: classical
@@ -240,7 +240,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-openai.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-google-ai:
     type: http
     behavior: classical
@@ -248,7 +248,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-google-ai.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-telegram:
     type: http
     behavior: classical
@@ -256,7 +256,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-telegram.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-apple:
     type: http
     behavior: classical
@@ -264,7 +264,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-apple.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-microsoft:
     type: http
     behavior: classical
@@ -272,7 +272,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-microsoft.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Microsoft/Microsoft.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-steam:
     type: http
     behavior: classical
@@ -280,7 +280,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-steam.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Steam/Steam.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-discord:
     type: http
     behavior: classical
@@ -288,7 +288,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-discord.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-mail:
     type: http
     behavior: classical
@@ -296,7 +296,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-mail.yaml
     url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Mail/Mail.yaml
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-gfw:
     type: http
     behavior: classical
@@ -304,7 +304,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-gfw.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-direct:
     type: http
     behavior: classical
@@ -312,7 +312,7 @@ rule-providers:
     path: ./ruleset/claude-citadel-direct.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
   claude-citadel-cn-ip:
     type: http
     behavior: ipcidr
@@ -320,4 +320,4 @@ rule-providers:
     path: ./ruleset/claude-citadel-cn-ip.txt
     url: https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt
     interval: 86400
-    proxy: DIRECT
+    proxy: 🔀 中转节点
