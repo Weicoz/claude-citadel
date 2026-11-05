@@ -530,6 +530,36 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         empty_loon = build_ini_based_client(self.loon_tpl, {}, "loon")
         self.assertNotIn("[Remote Rule]", empty_loon, "无自定义规则时残留空段")
 
+    def test_cross_client_hardening(self):
+        """各端都必须具备等价的防泄漏加固项。"""
+        clash = build_clash_stash(self.clash_tpl, {}, "clash")
+        stash = build_clash_stash(self.stash_tpl, {}, "stash")
+        for cfg, label in ((clash, "clash"), (stash, "stash")):
+            for rule in ("DST-PORT,3478,REJECT", "DST-PORT,19302,REJECT"):
+                self.assertIn(rule, cfg["rules"], f"{label} 缺少 STUN 拦截规则")
+            self.assertTrue(cfg["tun"]["enable"], f"{label} TUN 未启用")
+            self.assertTrue(cfg["tun"]["auto-route"], f"{label} 未接管全部路由")
+            self.assertTrue(cfg["tun"]["strict-route"], f"{label} 未启用严格路由")
+            self.assertIn("any:53", cfg["tun"]["dns-hijack"], f"{label} 未劫持 DNS")
+
+        surge = build_ini_based_client(self.surge_tpl, {}, "surge")
+        for key in (
+            "include-all-networks = true",
+            "include-local-networks = false",
+            "udp-policy-not-supported-behaviour = REJECT",
+            "tun-excluded-routes =",
+        ):
+            self.assertIn(key, surge, f"Surge 缺少 {key}")
+
+        loon = build_ini_based_client(self.loon_tpl, {}, "loon")
+        self.assertIn("bypass-tun =", loon, "Loon 缺少 bypass-tun")
+        self.assertIn("hijack-dns = *:53", loon, "Loon 缺少 DNS 劫持")
+
+        qx = build_ini_based_client(self.qx_tpl, {}, "qx")
+        self.assertIn("udp_drop_list = STUN", qx, "QX 缺少 STUN 丢弃")
+        self.assertIn("excluded_routes =", qx, "QX 缺少 excluded_routes")
+        self.assertIn("fallback_udp_policy = reject", qx, "QX 缺少 UDP 回退策略")
+
     def test_shadowrocket_hardening(self):
         """Shadowrocket 模板必须包含移动端防泄漏加固参数。"""
         text = build_ini_based_client(self.shadowrocket_tpl, {}, "shadowrocket")

@@ -275,6 +275,31 @@ custom_rules:
 > [!NOTE]
 > Surge / Loon / Shadowrocket / Quantumult X 的 `RULE-SET` 由客户端自行下载，无法像 Clash 那样在配置里指定下载代理。若所在网络无法直连 GitHub，请把模板中的 `raw.githubusercontent.com` 规则集地址替换为可访问的镜像。
 
+### 7. 各端 IP 防泄露加固
+
+各客户端能表达的加固项已写入模板，导入即生效：
+
+| 能力 | Clash / Stash | Surge | Loon | Quantumult X | Shadowrocket |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| TUN 接管全部流量 | `tun.auto-route` + `strict-route` | `include-all-networks = true` | TUN 默认接管 | TUN 默认接管 | `compatibility-mode = 3` |
+| 本地网络排除 | 由规则决定 | `include-local-networks = false` | `bypass-tun` | `excluded_routes` | `include-local-networks = false` |
+| DNS 劫持 | `tun.dns-hijack: any:53` | Enhanced Mode 默认 | `hijack-dns = *:53` | `dns_exclusion_list` | `hijack-dns = *:53` |
+| 节点不支持 UDP 时拒绝 | 规则层 `DST-PORT` 拦截 | `udp-policy-not-supported-behaviour = REJECT` | `allow-udp-proxy` 控制 | `fallback_udp_policy = reject` | `udp-policy-not-supported-behaviour = REJECT` |
+| STUN 防泄漏 | 规则拒绝 3478/19302/19305 | 不支持（仅能靠规则） | 不支持 | `udp_drop_list = STUN` | `stun-response-ip = 1.1.1.1` |
+
+仍需在 App 内手动设置：
+
+| 设置 | 说明 |
+| :--- | :--- |
+| 全局路由 = 配置 | 按规则分流，而非全局代理 |
+| 订阅 / 节点 → UDP 转发 | 客户端状态；且节点必须本身支持 UDP |
+
+> [!IMPORTANT]
+> 各端 UDP 转发能否生效取决于节点本身是否支持 UDP。本项目实测固定出口节点的 SOCKS5 UDP 不可用（10 次探测 0 次成功），因此固定出口只承载 TCP；UDP 流量会被拒绝或回退直连，请按需在客户端选择支持 UDP 的节点。
+
+> [!NOTE]
+> Surge / Loon / Shadowrocket / Quantumult X 的 `RULE-SET` 由客户端自行下载，无法像 Clash 那样在配置里指定下载代理。若所在网络无法直连 GitHub，请把模板中的 `raw.githubusercontent.com` 规则集地址替换为可访问的镜像。
+
 ### 7. 移动端 IP 防泄露加固
 
 Shadowrocket 的加固参数已写入 `shadowrocket.conf` 的 `[General]` 段（隐式参数，优先级高于 App 内同名开关）：

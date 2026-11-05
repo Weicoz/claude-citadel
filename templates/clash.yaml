@@ -168,6 +168,10 @@ proxy-groups:
   filter: (?i)台|tw|taiwan
   proxies: []
 rules:
+# ---- 防泄漏：拒绝 STUN/TURN 标准端口，避免 WebRTC 暴露真实公网 IP ----
+- DST-PORT,3478,REJECT
+- DST-PORT,19302,REJECT
+- DST-PORT,19305,REJECT
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
