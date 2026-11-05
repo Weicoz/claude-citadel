@@ -171,6 +171,11 @@ rules:
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,ipify.org,🇺🇸 海外出口
+- DOMAIN-SUFFIX,ifconfig.me,🇺🇸 海外出口
+- DOMAIN-SUFFIX,ipinfo.io,🇺🇸 海外出口
+- DOMAIN-SUFFIX,icanhazip.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,myip.com,🇺🇸 海外出口
 - PROCESS-NAME,claude,🇺🇸 海外出口
 - PROCESS-NAME,Claude,🇺🇸 海外出口
 - PROCESS-NAME,claude.exe,🇺🇸 海外出口
