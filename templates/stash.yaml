@@ -149,6 +149,9 @@ proxy-groups:
   filter: (?i)台|tw|taiwan
   proxies: []
 rules:
+- DOMAIN,cdn.jsdelivr.net,🌐 海外服务
+- DOMAIN,unpkg.com,🌐 海外服务
+- DOMAIN,cdnjs.cloudflare.com,🌐 海外服务
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口

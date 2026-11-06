@@ -95,6 +95,32 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertIn("host-suffix, mycompany.internal, direct", qx_out)
         self.assertIn("host-suffix, custom-claude-api.com, 🇺🇸 海外出口", qx_out)
 
+    def test_shared_cdns_use_overseas_service_before_claude(self):
+        """共享 CDN 优先走海外服务，避免被 Claude 进程或远端规则覆盖。"""
+        hosts = ("cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com")
+        dedicated = yaml.safe_load((ROOT / "rules/claude.yaml").read_text())["payload"]
+        plain = [line for line in (ROOT / "rules/claude.list").read_text().splitlines()
+                 if line and not line.startswith("#")]
+        self.assertEqual(dedicated, plain)
+        for host in hosts:
+            self.assertNotIn(f"DOMAIN,{host}", dedicated)
+        for client in ("clash", "stash", "surge", "loon", "shadowrocket", "qx"):
+            with self.subTest(client=client):
+                if client in ("clash", "stash"):
+                    rules = build_clash_stash(TEMPLATES_DIR / f"{client}.yaml", {}, client)["rules"]
+                    guard = next(i for i, rule in enumerate(rules)
+                                 if rule.startswith("PROCESS-NAME,claude,"))
+                else:
+                    output = build_ini_based_client(TEMPLATES_DIR / f"{client}.conf", {}, client)
+                    section = "[filter_local]" if client == "qx" else "[Rule]"
+                    rules = output.split(section, 1)[1].splitlines()
+                    guard = next(i for i, rule in enumerate(rules) if "claude.ai" in rule)
+                for host in hosts:
+                    rule = (f"host, {host}, 🌐 海外服务" if client == "qx"
+                            else f"DOMAIN,{host},🌐 海外服务")
+                    self.assertEqual(rules.count(rule), 1)
+                    self.assertLess(rules.index(rule), guard)
+
     def test_relay_chain_toggle_disabled(self):
         """测试禁用代理链时，节点保持直连拨号。"""
         profile = {
