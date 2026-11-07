@@ -1,0 +1,21 @@
+main:
+  push:
+    - docker:
+        image: python:3.12
+      stages:
+        - name: 安装依赖
+          script: "python -m pip install pyyaml"
+        - name: 安装离线校验器
+          script: "mkdir -p bin && curl -fLsS https://github.com/MetaCubeX/mihomo/releases/download/v1.19.32/mihomo-linux-amd64-compatible-v1.19.32.gz -o bin/mihomo.gz && printf \"%s\\n\" \"ba3ce607747a07f948fc35780e108a4a7c7f552a38b9bd4d115f313ebcb89c20  bin/mihomo.gz\" | sha256sum --check && gzip -dc bin/mihomo.gz > bin/mihomo && chmod +x bin/mihomo"
+        - name: 回归测试
+          script: "python -m unittest discover -s tests -v"
+  pull_request:
+    - docker:
+        image: python:3.12
+      stages:
+        - name: 安装依赖
+          script: "python -m pip install pyyaml"
+        - name: 安装离线校验器
+          script: "mkdir -p bin && curl -fLsS https://github.com/MetaCubeX/mihomo/releases/download/v1.19.32/mihomo-linux-amd64-compatible-v1.19.32.gz -o bin/mihomo.gz && printf \"%s\\n\" \"ba3ce607747a07f948fc35780e108a4a7c7f552a38b9bd4d115f313ebcb89c20  bin/mihomo.gz\" | sha256sum --check && gzip -dc bin/mihomo.gz > bin/mihomo && chmod +x bin/mihomo"
+        - name: 回归测试
+          script: "python -m unittest discover -s tests -v"
