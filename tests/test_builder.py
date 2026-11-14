@@ -579,6 +579,13 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
     def test_network_overrides_and_cn_domains(self):
         """profile 的 network 覆盖生效；Clash 使用 MRS 版国内域名规则集。"""
+        public_domains = ("qpic.cn", "weixin.qq.com", "woshipm.com", "ebrun.com", "dsb.cn", "yangkeduo.com")
+        for template, client in ((self.clash_tpl, "clash"), (self.stash_tpl, "stash")):
+            for profile_data in ({}, {"network": {"fake_ip_filter_extra": ["+.qpic.cn"]}}):
+                config = build_clash_stash(template, profile_data, client)
+                for domain in public_domains:
+                    self.assertEqual(config["dns"]["fake-ip-filter"].count("+." + domain), 1,
+                                     f"{client} 的公域DNS排除缺失或重复：{domain}")
         profile = {
             "network": {
                 "tun_exclude_address": ["203.0.113.7/32"],
@@ -659,6 +666,71 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
             "udp-policy-not-supported-behaviour = REJECT",
         ):
             self.assertIn(line, text, f"Shadowrocket 缺少 {line}")
+
+    def test_chain_all_relay_nodes_expands_fixed_exits(self):
+        """chain_all_relay_nodes 开启后，每个前置节点 × 每个出口展开为固定链路条目。"""
+        from unittest import mock
+        import build as build_module
+
+        profile = {
+            "claude_exits": {
+                "chain_all_relay_nodes": True,
+                "use_relay_chain": True,
+                "custom_proxies": [
+                    {"name": "波特兰 SOCKS5", "type": "socks5", "server": "198.51.100.1", "port": 1080},
+                    {"name": "波特兰 HTTP", "type": "http", "server": "198.51.100.1", "port": 8080},
+                ],
+            },
+            "relays": {
+                "subscriptions": [{"name": "猫咪云", "emoji": "🐱", "url": "https://sub.a.com/sub"}],
+                "custom_proxies": [
+                    {"name": "🇯🇵 自建日本直连", "type": "ss", "server": "198.51.100.2", "port": 8388}
+                ],
+            },
+        }
+        fake_nodes = [
+            {"name": "香港-01", "type": "ss", "server": "198.51.100.3", "port": 8388},
+            {"name": "[猫咪云] 澳门-01", "type": "ss", "server": "198.51.100.4", "port": 8388},
+        ]
+
+        with mock.patch.object(build_module, "fetch_subscription_nodes", return_value=fake_nodes):
+            config = build_clash_stash(self.clash_tpl, profile, "clash")
+
+        group = next(g for g in config["proxy-groups"] if g["name"] == "🇺🇸 海外出口")
+        names = group["proxies"]
+        # 3 个前置节点 × 2 个出口 = 6 条组合，加 2 条原出口
+        self.assertEqual(len(names), 8, f"组内条目数不符: {names}")
+        # 按出口分块：原出口紧跟自己的组合条目
+        self.assertEqual(names[0], "波特兰 SOCKS5")
+        self.assertEqual(names[1], "🇯🇵 自建日本直连 → 波特兰 SOCKS5")
+        self.assertEqual(names[2], "[猫咪云] 香港-01 → 波特兰 SOCKS5")
+        # 订阅节点名已带前缀时不得重复拼接
+        self.assertEqual(names[3], "[猫咪云] 澳门-01 → 波特兰 SOCKS5")
+        self.assertEqual(names[4], "波特兰 HTTP")
+
+        proxies = {p["name"]: p for p in config["proxies"]}
+        self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "⛓ [猫咪云] 香港-01")
+        self.assertEqual(proxies["🇯🇵 自建日本直连 → 波特兰 SOCKS5"]["dialer-proxy"], "🇯🇵 自建日本直连")
+        self.assertIn("⛓ [猫咪云] 香港-01", proxies, "订阅节点未内联为隐藏静态节点")
+
+        # 内联节点不得混入中转池，避免污染测速与地区组
+        relay_group = next(g for g in config["proxy-groups"] if g["name"] == "🔀 中转节点")
+        self.assertNotIn("⛓ [猫咪云] 香港-01", relay_group.get("proxies") or [])
+
+    def test_chain_all_relay_nodes_default_off(self):
+        """未开启开关时，出口组保持原样，不拉订阅、不生成组合。"""
+        profile = {
+            "claude_exits": {
+                "use_relay_chain": True,
+                "custom_proxies": [
+                    {"name": "波特兰 SOCKS5", "type": "socks5", "server": "198.51.100.1", "port": 1080}
+                ],
+            },
+            "relays": {"subscriptions": [{"name": "猫咪云", "url": "https://sub.a.com/sub"}]},
+        }
+        config = build_clash_stash(self.clash_tpl, profile, "clash")
+        group = next(g for g in config["proxy-groups"] if g["name"] == "🇺🇸 海外出口")
+        self.assertEqual(group["proxies"], ["波特兰 SOCKS5"])
 
     def test_ini_cncidr_and_validator(self):
         """ini 四端使用 Surge 格式的 cn CIDR；内核校验失败时必须返回 False。"""

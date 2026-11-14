@@ -19,6 +19,12 @@ claude_exits:
   # 全局默认开关 (可选兜底配置)：若节点自身未填写 dialer-proxy，则以 use_relay_chain 为准
   use_relay_chain: true
 
+  # 链路组合开关：为「每个前置节点 × 每个出口」生成固定条目，选中即完整链路。
+  # - true: 出口组里直接列出「节点A → 出口X」，逐条测速即可判断哪条线通到出口
+  # - false: 出口组只列出口本身，前置转由 🔀 中转节点 组决定（默认）
+  # 代价：条目数 = 前置节点数 × 出口数，订阅节点会在构建时拉取并内联为隐藏静态节点。
+  chain_all_relay_nodes: false
+
   # 形态 A：手动配置节点 (如自建 VPS / 独立住宅 IP / 特殊代理出口，地区可自定义)
   # 支持 socks5, http, ss, trojan, vmess 等所有主流协议
   custom_proxies:

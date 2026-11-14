@@ -105,6 +105,21 @@ claude_exits:
   subscriptions: []
 ```
 
+#### 链路组合（`chain_all_relay_nodes`）
+开启后，`🇺🇸 海外出口` 会为「每个前置节点 × 每个出口」各生成一条固定条目，选中即完成 `前置节点拨号 → 出口 IP 发出`。切一次选项、测一次延迟，就能判断哪条线通到出口。
+
+```yaml
+claude_exits:
+  chain_all_relay_nodes: true   # 默认 false
+```
+
+- 条目数 = 前置节点数 × 出口数。例：200 个节点 × 2 个出口 = 400 条，配置约 300KB。
+- 前置节点来自两处：`relays.custom_proxies` 的具名节点，以及 `relays.subscriptions` 的订阅节点。
+- 订阅节点在构建时拉取并内联为 `⛓` 前缀的隐藏静态节点，不进入任何策略组、不参与测速。
+- 必须内联的原因：`dialer-proxy` 只在配置解析阶段按名字查静态节点，`proxy-providers` 注入的节点此时不存在，直接引用会报 `dialer-proxy not found` 并导致配置加载失败。
+- 仅对 Clash / Stash 生效，其余 4 端输出保持不变。
+- 订阅拉取失败时跳过该订阅的链路组合并告警，构建继续；节点改名或下线后，下次构建自动重算。
+
 ### 2. 通用中转池 (`relays`)
 用于日常网页浏览、OpenAI、Steam、Google、Telegram 等公网流量：
 ```yaml

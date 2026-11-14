@@ -17,6 +17,7 @@
 """
 
 import argparse
+import copy
 import json
 import os
 from pathlib import Path
@@ -354,6 +355,108 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type=
     return config
 
 
+# ---------------------------------------------------------------------------
+# 海外出口链路组合：把「每个前置节点 × 每个出口」展开成可直接点选的固定条目
+# ---------------------------------------------------------------------------
+# dialer-proxy 只在配置解析阶段按名字查静态节点，proxy-providers 注入的节点此时还不存在，
+# 所以订阅节点必须内联成隐藏静态节点（⛓ 前缀），否则 mihomo 会报 dialer-proxy not found。
+_SUBSCRIPTION_NODE_CACHE = {}
+_EXCLUDE_PROXY_TYPES = {"direct", "reject", "compatible", "pass"}
+_EXCLUDE_NAME_RE = re.compile(DEFAULT_EXCLUDE_FILTER)
+
+
+def fetch_subscription_nodes(sub, timeout=30):
+    """拉取订阅并返回 Clash 格式节点列表；非 Clash 格式或拉取失败返回 None。"""
+    url = sub.get("url")
+    if not url:
+        return None
+    cache_key = (url, sub.get("user_agent"))
+    if cache_key in _SUBSCRIPTION_NODE_CACHE:
+        return _SUBSCRIPTION_NODE_CACHE[cache_key]
+
+    label = sub.get("name", "未命名订阅")
+    headers = {"User-Agent": sub.get("user_agent") or "clash.meta"}
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = yaml.safe_load(resp.read())
+    except Exception as e:
+        log(f"订阅 {label} 拉取失败，跳过其链路组合：{e}", "WARN")
+        _SUBSCRIPTION_NODE_CACHE[cache_key] = None
+        return None
+
+    proxies = data.get("proxies") if isinstance(data, dict) else None
+    if not isinstance(proxies, list):
+        log(f"订阅 {label} 不是 Clash 格式，跳过其链路组合。", "WARN")
+        _SUBSCRIPTION_NODE_CACHE[cache_key] = None
+        return None
+
+    _SUBSCRIPTION_NODE_CACHE[cache_key] = proxies
+    return proxies
+
+
+def build_chain_pool(relays_cfg):
+    """前置节点池：具名节点直接用原名，订阅节点内联为隐藏静态节点。
+
+    返回 [(展示名, 节点字典)]，展示名与运行时节点名保持一致（订阅前缀 + 原始节点名）。
+    """
+    pool, seen = [], set()
+
+    for p in relays_cfg.get("custom_proxies") or []:
+        if isinstance(p, dict) and p.get("name") and p["name"] not in seen:
+            seen.add(p["name"])
+            pool.append((p["name"], p))
+
+    for sub in relays_cfg.get("subscriptions") or []:
+        if not isinstance(sub, dict) or not sub.get("url"):
+            continue
+        nodes = fetch_subscription_nodes(sub)
+        if not nodes:
+            continue
+        prefix = f"[{sub.get('name', 'sub')}] "
+        for node in nodes:
+            if not isinstance(node, dict) or not node.get("name"):
+                continue
+            raw_name = str(node["name"])
+            if str(node.get("type", "")).lower() in _EXCLUDE_PROXY_TYPES:
+                continue
+            if _EXCLUDE_NAME_RE.search(raw_name):
+                continue
+            # 订阅节点名若已自带同样的前缀，不再重复拼接（如 gist 里已是 "[TNTCloud] 香港-01"）
+            display = raw_name if raw_name.startswith(prefix) else prefix + raw_name
+            if display in seen:
+                continue
+            seen.add(display)
+            hidden = copy.deepcopy(node)
+            hidden["name"] = f"⛓ {display}"
+            pool.append((display, hidden))
+
+    return pool
+
+
+def expand_chain_exits(claude_custom, pool):
+    """按出口分块展开：原出口 → 该出口的全部固定链路，返回 (条目列表, 隐藏节点列表)。"""
+    expanded, hidden = [], []
+    hidden_seen = set()
+
+    for p in claude_custom:
+        if not (isinstance(p, dict) and p.get("name")):
+            continue
+        expanded.append(p)
+        for display, node in pool:
+            combo = copy.deepcopy(p)
+            for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+                combo.pop(key, None)
+            combo["name"] = f"{display} → {p['name']}"
+            combo["dialer-proxy"] = node["name"]
+            expanded.append(combo)
+            if node["name"].startswith("⛓ ") and node["name"] not in hidden_seen:
+                hidden_seen.add(node["name"])
+                hidden.append(node)
+
+    return expanded, hidden
+
+
 def build_clash_stash(template_path, profile_data, client_type="clash"):
     """渲染 Clash / Stash 配置。"""
     with open(template_path, "r", encoding="utf-8") as f:
@@ -385,6 +488,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     use_relay_chain = claude_cfg.get("use_relay_chain", False)
     claude_custom = claude_cfg.get("custom_proxies", []) or []
     claude_subs = claude_cfg.get("subscriptions", []) or []
+
+    # 链路组合：每个前置节点 × 每个出口展开成固定条目，选中即完整链路
+    chain_hidden = []
+    if claude_cfg.get("chain_all_relay_nodes"):
+        chain_pool = build_chain_pool(relays_cfg)
+        exit_count = len([p for p in claude_custom if isinstance(p, dict) and p.get("name")])
+        claude_custom, chain_hidden = expand_chain_exits(claude_custom, chain_pool)
+        log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {len(claude_custom)} 条条目")
 
     relay_subs = relays_cfg.get("subscriptions", []) or []
     relay_custom = relays_cfg.get("custom_proxies", []) or []
@@ -436,6 +547,12 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                     p_copy.pop("dialer-proxy", None)
                 all_proxies.append(p_copy)
                 seen_proxy_names.add(p_copy["name"])
+
+    # 内联的前置节点只供链路组合引用，不进入任何策略组，避免污染中转池与测速列表
+    for hidden_proxy in chain_hidden:
+        if hidden_proxy["name"] not in seen_proxy_names:
+            all_proxies.append(hidden_proxy)
+            seen_proxy_names.add(hidden_proxy["name"])
 
     config["proxies"] = all_proxies
 
