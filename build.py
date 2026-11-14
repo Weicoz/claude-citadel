@@ -495,7 +495,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         chain_pool = build_chain_pool(relays_cfg)
         exit_count = len([p for p in claude_custom if isinstance(p, dict) and p.get("name")])
         claude_custom, chain_hidden = expand_chain_exits(claude_custom, chain_pool)
-        log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {len(claude_custom)} 条条目")
+        combo_count = len(claude_custom) - exit_count
+        log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合（另含 {exit_count} 条原出口）")
 
     relay_subs = relays_cfg.get("subscriptions", []) or []
     relay_custom = relays_cfg.get("custom_proxies", []) or []
