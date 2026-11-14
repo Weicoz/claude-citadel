@@ -20,6 +20,13 @@ dns:
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/15
   fake-ip-filter:
+  # 公域内容与图片使用真实DNS，避免下载器拒绝fake-IP地址
+  - +.qpic.cn
+  - +.weixin.qq.com
+  - +.woshipm.com
+  - +.ebrun.com
+  - +.dsb.cn
+  - +.yangkeduo.com
   - +.kuaishou.com
   - +.kuaishou.cn
   - +.gifshow.com
