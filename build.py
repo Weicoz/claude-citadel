@@ -435,26 +435,53 @@ def build_chain_pool(relays_cfg):
 
 
 def expand_chain_exits(claude_custom, pool):
-    """按出口分块展开：原出口 → 该出口的全部固定链路，返回 (条目列表, 隐藏节点列表)。"""
-    expanded, hidden = [], []
+    """按出口分块展开：原出口 → 该出口的自动择优/Fallback → 全部固定链路。
+
+    返回 (条目列表, 隐藏节点列表, 新增策略组, 出口组内的条目顺序)。
+    """
+    expanded, hidden, aux_groups, group_order = [], [], [], []
     hidden_seen = set()
 
     for p in claude_custom:
         if not (isinstance(p, dict) and p.get("name")):
             continue
+        exit_name = p["name"]
         expanded.append(p)
+        group_order.append(exit_name)
+
+        combo_names = []
         for display, node in pool:
             combo = copy.deepcopy(p)
             for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
                 combo.pop(key, None)
-            combo["name"] = f"{display} → {p['name']}"
+            combo["name"] = f"{display} → {exit_name}"
             combo["dialer-proxy"] = node["name"]
             expanded.append(combo)
+            combo_names.append(combo["name"])
             if node["name"].startswith("⛓ ") and node["name"] not in hidden_seen:
                 hidden_seen.add(node["name"])
                 hidden.append(node)
 
-    return expanded, hidden
+        if not combo_names:
+            continue
+
+        # 同一出口的全部固定链路：一个自动择优（取最快）、一个 Fallback（取首个存活）
+        auto_name = f"⚡ {exit_name} 自动择优"
+        fallback_name = f"🛟 {exit_name} Fallback"
+        probe = {
+            "url": DEFAULT_PROBE_URL,
+            "expected-status": DEFAULT_EXPECTED_STATUS,
+            "interval": DEFAULT_STANDBY_INTERVAL,
+            "timeout": DEFAULT_TIMEOUT,
+        }
+        aux_groups.append(dict({"name": auto_name, "type": "url-test",
+                                "tolerance": DEFAULT_TOLERANCE, "proxies": list(combo_names)}, **probe))
+        aux_groups.append(dict({"name": fallback_name, "type": "fallback",
+                                "proxies": list(combo_names)}, **probe))
+        group_order.extend([auto_name, fallback_name])
+        group_order.extend(combo_names)
+
+    return expanded, hidden, aux_groups, group_order
 
 
 def build_clash_stash(template_path, profile_data, client_type="clash"):
@@ -490,13 +517,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     claude_subs = claude_cfg.get("subscriptions", []) or []
 
     # 链路组合：每个前置节点 × 每个出口展开成固定条目，选中即完整链路
-    chain_hidden = []
+    chain_hidden, chain_groups, chain_order = [], [], []
     if claude_cfg.get("chain_all_relay_nodes"):
         chain_pool = build_chain_pool(relays_cfg)
         exit_count = len([p for p in claude_custom if isinstance(p, dict) and p.get("name")])
-        claude_custom, chain_hidden = expand_chain_exits(claude_custom, chain_pool)
+        claude_custom, chain_hidden, chain_groups, chain_order = expand_chain_exits(claude_custom, chain_pool)
         combo_count = len(claude_custom) - exit_count
-        log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合（另含 {exit_count} 条原出口）")
+        log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合"
+            f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个自动择优/Fallback 组）")
 
     relay_subs = relays_cfg.get("subscriptions", []) or []
     relay_custom = relays_cfg.get("custom_proxies", []) or []
@@ -741,11 +769,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             claude_pool = claude_custom_names.copy()
             if claude_provider_ids:
                 g["use"] = claude_provider_ids
-            if claude_pool or claude_provider_ids:
+            if chain_order:
+                g["proxies"] = chain_order
+            elif claude_pool or claude_provider_ids:
                 g["proxies"] = claude_pool if claude_pool else ["⚡ 自动择优"]
             else:
                 g["proxies"] = ["🇺🇸 美国节点", "🔀 中转节点", "DIRECT"]
             new_groups.append(g)
+            new_groups.extend(copy.deepcopy(chain_groups))
 
         elif g_name == "🔀 中转节点":
             if custom_relay_def:

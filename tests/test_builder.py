@@ -698,15 +698,27 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
         group = next(g for g in config["proxy-groups"] if g["name"] == "🇺🇸 海外出口")
         names = group["proxies"]
-        # 3 个前置节点 × 2 个出口 = 6 条组合，加 2 条原出口
-        self.assertEqual(len(names), 8, f"组内条目数不符: {names}")
-        # 按出口分块：原出口紧跟自己的组合条目
+        # 3 个前置节点 × 2 个出口 = 6 条组合，加 2 条原出口与 4 个自动择优/Fallback 组
+        self.assertEqual(len(names), 12, f"组内条目数不符: {names}")
+        # 按出口分块：原出口 → 自动择优 → Fallback → 该出口的组合条目
         self.assertEqual(names[0], "波特兰 SOCKS5")
-        self.assertEqual(names[1], "🇯🇵 自建日本直连 → 波特兰 SOCKS5")
-        self.assertEqual(names[2], "[猫咪云] 香港-01 → 波特兰 SOCKS5")
+        self.assertEqual(names[1], "⚡ 波特兰 SOCKS5 自动择优")
+        self.assertEqual(names[2], "🛟 波特兰 SOCKS5 Fallback")
+        self.assertEqual(names[3], "🇯🇵 自建日本直连 → 波特兰 SOCKS5")
+        self.assertEqual(names[4], "[猫咪云] 香港-01 → 波特兰 SOCKS5")
         # 订阅节点名已带前缀时不得重复拼接
-        self.assertEqual(names[3], "[猫咪云] 澳门-01 → 波特兰 SOCKS5")
-        self.assertEqual(names[4], "波特兰 HTTP")
+        self.assertEqual(names[5], "[猫咪云] 澳门-01 → 波特兰 SOCKS5")
+        self.assertEqual(names[6], "波特兰 HTTP")
+
+        groups = {g["name"]: g for g in config["proxy-groups"]}
+        auto = groups["⚡ 波特兰 SOCKS5 自动择优"]
+        self.assertEqual(auto["type"], "url-test")
+        self.assertEqual(len(auto["proxies"]), 3, "自动择优组应覆盖该出口的全部组合")
+        self.assertIn("[猫咪云] 澳门-01 → 波特兰 SOCKS5", auto["proxies"])
+        fallback = groups["🛟 波特兰 SOCKS5 Fallback"]
+        self.assertEqual(fallback["type"], "fallback")
+        self.assertEqual(fallback["proxies"], auto["proxies"], "Fallback 与自动择优成员应一致")
+        self.assertNotIn("波特兰 SOCKS5", fallback["proxies"], "原出口条目不得进入组合组")
 
         proxies = {p["name"]: p for p in config["proxies"]}
         self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "⛓ [猫咪云] 香港-01")
