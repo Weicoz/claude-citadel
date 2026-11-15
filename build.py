@@ -38,6 +38,16 @@ DEFAULT_TIMEOUT = 4000
 DEFAULT_TOLERANCE = 100
 DEFAULT_PRIMARY_INTERVAL = 90
 DEFAULT_STANDBY_INTERVAL = 300
+# 订阅拉取、节点过滤与内联标记的共用约定：provider 与链路组合必须用同一套规则，
+# 否则组合条目的 dialer-proxy 会指向不存在的节点名，整个配置直接加载失败。
+DEFAULT_EXCLUDE_TYPES = "direct|reject|compatible|pass"
+DEFAULT_SUB_USER_AGENT = "clash.meta"
+HIDDEN_NODE_PREFIX = "⛓ "
+
+
+def build_subscription_prefix(name):
+    """订阅节点在运行期统一带的前缀，provider 与链路组合共用。"""
+    return f"[{name}] "
 
 
 def log(msg, level="INFO"):
@@ -361,7 +371,7 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type=
 # dialer-proxy 只在配置解析阶段按名字查静态节点，proxy-providers 注入的节点此时还不存在，
 # 所以订阅节点必须内联成隐藏静态节点（⛓ 前缀），否则 mihomo 会报 dialer-proxy not found。
 _SUBSCRIPTION_NODE_CACHE = {}
-_EXCLUDE_PROXY_TYPES = {"direct", "reject", "compatible", "pass"}
+_EXCLUDE_PROXY_TYPES = set(DEFAULT_EXCLUDE_TYPES.split("|"))
 _EXCLUDE_NAME_RE = re.compile(DEFAULT_EXCLUDE_FILTER)
 
 
@@ -375,7 +385,7 @@ def fetch_subscription_nodes(sub, timeout=30):
         return _SUBSCRIPTION_NODE_CACHE[cache_key]
 
     label = sub.get("name", "未命名订阅")
-    headers = {"User-Agent": sub.get("user_agent") or "clash.meta"}
+    headers = {"User-Agent": sub.get("user_agent") or DEFAULT_SUB_USER_AGENT}
     try:
         req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -405,7 +415,7 @@ def build_chain_pool(relays_cfg):
     for p in relays_cfg.get("custom_proxies") or []:
         if isinstance(p, dict) and p.get("name") and p["name"] not in seen:
             seen.add(p["name"])
-            pool.append((p["name"], p))
+            pool.append((p["name"], p, False))
 
     for sub in relays_cfg.get("subscriptions") or []:
         if not isinstance(sub, dict) or not sub.get("url"):
@@ -413,7 +423,7 @@ def build_chain_pool(relays_cfg):
         nodes = fetch_subscription_nodes(sub)
         if not nodes:
             continue
-        prefix = f"[{sub.get('name', 'sub')}] "
+        prefix = build_subscription_prefix(sub.get("name", "sub"))
         for node in nodes:
             if not isinstance(node, dict) or not node.get("name"):
                 continue
@@ -428,8 +438,8 @@ def build_chain_pool(relays_cfg):
                 continue
             seen.add(display)
             hidden = copy.deepcopy(node)
-            hidden["name"] = f"⛓ {display}"
-            pool.append((display, hidden))
+            hidden["name"] = HIDDEN_NODE_PREFIX + display
+            pool.append((display, hidden, True))
 
     return pool
 
@@ -459,6 +469,7 @@ def resolve_chain_group_options(chain_cfg):
             "auto_select": pick(names_cfg.get("auto_select"), "⚡ {exit} 自动择优"),
             "fallback": pick(names_cfg.get("fallback"), "🛟 {exit} Fallback"),
             "picker": pick(names_cfg.get("picker"), "📍 {exit} 链路"),
+            "combo": pick(names_cfg.get("combo"), "{node} → {exit}"),
         },
     }
 
@@ -480,17 +491,17 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
         group_order.append(exit_name)
 
         combo_names = []
-        for display, node in pool:
+        for display, node, is_inline in pool:
             combo = copy.deepcopy(p)
             # 组合条目由策略组统一测速，出口自带的单点测速字段没有意义，裁掉可省约 10% 体积
             for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via",
                         "benchmark-url", "benchmark-timeout"]:
                 combo.pop(key, None)
-            combo["name"] = f"{display} → {exit_name}"
+            combo["name"] = opts["names"]["combo"].format(node=display, exit=exit_name)
             combo["dialer-proxy"] = node["name"]
             expanded.append(combo)
             combo_names.append(combo["name"])
-            if node["name"].startswith("⛓ ") and node["name"] not in hidden_seen:
+            if is_inline and node["name"] not in hidden_seen:
                 hidden_seen.add(node["name"])
                 hidden.append(node)
 
@@ -633,7 +644,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             continue
         pid = s.get("id") or f"{sanitize_id(s.get('name', f'sub_{idx}'))}_{idx}"
         relay_provider_ids.append(pid)
-        prefix = f"[{s.get('name', pid)}] "
+        prefix = build_subscription_prefix(s.get("name", pid))
 
         is_primary = (idx == 1)
         prov = {
@@ -650,7 +661,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                 "timeout": DEFAULT_TIMEOUT,
                 "lazy": False
             },
-            "exclude-type": "direct|reject|compatible|pass",
+            "exclude-type": DEFAULT_EXCLUDE_TYPES,
             "exclude-filter": DEFAULT_EXCLUDE_FILTER,
             "override": {
                 "additional-prefix": prefix,
@@ -683,7 +694,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                 "timeout": DEFAULT_TIMEOUT,
                 "lazy": False
             },
-            "exclude-type": "direct|reject|compatible|pass",
+            "exclude-type": DEFAULT_EXCLUDE_TYPES,
             "override": {
                 "additional-prefix": prefix
             }

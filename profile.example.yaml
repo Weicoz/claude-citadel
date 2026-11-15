@@ -31,10 +31,11 @@ claude_exits:
   #   fallback: true             # 🛟 Fallback（取首个存活链路）
   #   picker: true               # 📍 链路清单（select 子组；false 则条目平铺回出口组）
   #   lazy: true                 # 前两组只在被选中时探测，避免几百条链路后台空转
-  #   names:                     # 组名模板，{exit} 会替换为出口名
+  #   names:                     # 组名与条目名模板：{exit} 出口名，{node} 前置节点名
   #     auto_select: "⚡ {exit} 自动择优"
   #     fallback: "🛟 {exit} Fallback"
   #     picker: "📍 {exit} 链路"
+  #     combo: "{node} → {exit}"  # 单条链路的显示名
   #   probe:                     # 探测参数
   #     url: "http://cp.cloudflare.com/generate_204"
   #     expected_status: "204"

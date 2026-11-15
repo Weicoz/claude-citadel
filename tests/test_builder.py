@@ -760,7 +760,8 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
         custom = {
             "chain_groups": {
-                "names": {"auto_select": "FAST {exit}", "fallback": "FB {exit}", "picker": "PICK {exit}"},
+                "names": {"auto_select": "FAST {exit}", "fallback": "FB {exit}",
+                          "picker": "PICK {exit}", "combo": "{node} @ {exit}"},
                 "probe": {"url": "https://probe.example.com", "expected_status": "200",
                           "interval": 600, "timeout": 2500, "tolerance": 50},
                 "lazy": False,
@@ -781,6 +782,8 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(auto["timeout"], 2500)
         self.assertEqual(auto["tolerance"], 50)
         self.assertFalse(auto.get("lazy"), "lazy 关闭后不应写入该字段")
+        link_names = groups["PICK 波特兰 SOCKS5"]["proxies"]
+        self.assertEqual(link_names, ["🇯🇵 自建日本直连 @ 波特兰 SOCKS5"], "组合名模板未生效")
 
         # 三个组全关时退回扁平列表，行为等同未分层
         flat = {
