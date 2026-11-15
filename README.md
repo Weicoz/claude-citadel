@@ -141,6 +141,10 @@ relays:
       emoji: "❤️"
       url: "https://sub.airport2.com/api/v1/client/subscribe?token=yyy"
 
+  # 来源优先级（可选）：链路组合、机场测速组与中转清单都按此排序，
+  # 名字取自订阅 name 或节点名里的 [前缀]；未列出的来源排在最后，留空则保持原顺序。
+  order: ["liangxin", "miaona", "Amy"]
+
   # 手动直连中转节点 (如自建香港/日本直连 VPS)
   custom_proxies:
     - name: "🇯🇵 自建日本直连"

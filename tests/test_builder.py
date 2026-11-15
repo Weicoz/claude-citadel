@@ -121,6 +121,32 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                     self.assertEqual(rules.count(rule), 1)
                     self.assertLess(rules.index(rule), guard)
 
+    def test_relay_order_priority(self):
+        """relays.order 决定链路组合与机场组顺序，未列出的来源排在最后。"""
+        profile = {
+            "claude_exits": {
+                "use_relay_chain": True,
+                "chain_all_relay_nodes": True,
+                "custom_proxies": [
+                    {"name": "🇺🇸 波特兰", "type": "socks5", "server": "198.51.100.1", "port": 1080}
+                ],
+            },
+            "relays": {
+                "order": ["乙机场", "甲机场"],
+                "custom_proxies": [
+                    {"name": "[甲机场] 香港 01", "type": "ss", "server": "198.51.100.2", "port": 8388},
+                    {"name": "[乙机场] 日本 01", "type": "ss", "server": "198.51.100.3", "port": 8388},
+                ],
+            },
+        }
+        cfg = build_clash_stash(self.clash_tpl, profile, "clash")
+        picker = next(g for g in cfg["proxy-groups"] if g["name"] == "📍 🇺🇸 波特兰 链路")
+        members = picker["proxies"]
+        self.assertEqual(members[0], "🇺🇸 波特兰")
+        yi = next(i for i, m in enumerate(members) if m.startswith("[乙机场]"))
+        jia = next(i for i, m in enumerate(members) if m.startswith("[甲机场]"))
+        self.assertLess(yi, jia, "order 里先列出的来源必须排在前面")
+
     def test_relay_chain_toggle_disabled(self):
         """测试禁用代理链时，节点保持直连拨号。"""
         profile = {
@@ -715,6 +741,7 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(link["type"], "select")
         # 3 个前置节点 → 3 条组合；订阅节点名已带前缀时不得重复拼接
         self.assertEqual(link["proxies"], [
+            "波特兰 SOCKS5",
             "🇯🇵 自建日本直连 → 波特兰 SOCKS5",
             "[猫咪云] 香港-01 → 波特兰 SOCKS5",
             "[猫咪云] 澳门-01 → 波特兰 SOCKS5",
@@ -722,14 +749,14 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
         auto = groups["⚡ 波特兰 SOCKS5 自动择优"]
         self.assertEqual(auto["type"], "url-test")
-        self.assertEqual(len(auto["proxies"]), 3, "自动择优组应覆盖该出口的全部组合")
+        self.assertEqual(len(auto["proxies"]), 4, "自动择优组应覆盖原出口与全部组合")
         self.assertIn("[猫咪云] 澳门-01 → 波特兰 SOCKS5", auto["proxies"])
         fallback = groups["🛟 波特兰 SOCKS5 Fallback"]
         self.assertEqual(fallback["type"], "fallback")
         self.assertTrue(auto.get("lazy"), "自动择优组应开启 lazy，避免后台空转")
         self.assertTrue(fallback.get("lazy"), "Fallback 组应开启 lazy，避免后台空转")
         self.assertEqual(fallback["proxies"], auto["proxies"], "Fallback 与自动择优成员应一致")
-        self.assertNotIn("波特兰 SOCKS5", fallback["proxies"], "原出口条目不得进入组合组")
+        self.assertEqual(fallback["proxies"][0], "波特兰 SOCKS5", "原出口（中转链路）应作为首选项")
 
         proxies = {p["name"]: p for p in config["proxies"]}
         self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "⛓ [猫咪云] 香港-01")
@@ -787,7 +814,7 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(auto["tolerance"], 50)
         self.assertFalse(auto.get("lazy"), "lazy 关闭后不应写入该字段")
         link_names = groups["PICK 波特兰 SOCKS5"]["proxies"]
-        self.assertEqual(link_names, ["🇯🇵 自建日本直连 @ 波特兰 SOCKS5"], "组合名模板未生效")
+        self.assertEqual(link_names, ["波特兰 SOCKS5", "🇯🇵 自建日本直连 @ 波特兰 SOCKS5"], "组合名模板未生效")
 
         # 三个组全关时退回扁平列表，行为等同未分层
         flat = {

@@ -405,6 +405,48 @@ def fetch_subscription_nodes(sub, timeout=30):
     return proxies
 
 
+_PROVIDER_PREFIX_RE = re.compile(r"^\[([^\]]+)\]\s*")
+
+
+def resolve_provider_order(relays_cfg):
+    """profile.relays.order：机场/节点来源的优先级顺序（订阅名或节点名里的 [前缀]）。
+
+    缺省返回空列表，此时保持原有顺序（先进 custom_proxies、后进 subscriptions）。
+    """
+    raw = (relays_cfg or {}).get("order") or []
+    return [str(item).strip().lower() for item in raw if str(item).strip()]
+
+
+def provider_key(name):
+    """取节点所属来源：`[Amy] 🇭🇰 香港 01` → amy；无前缀时退回整名。"""
+    match = _PROVIDER_PREFIX_RE.match(str(name or ""))
+    return (match.group(1) if match else str(name or "")).strip().lower()
+
+
+def order_by_provider(items, order, name_of=None):
+    """按 relays.order 稳定排序；未列出的来源排在已列出的之后，保持原序。"""
+    if not order:
+        return list(items)
+    pick = name_of or (lambda item: item)
+    rank = {name: index for index, name in enumerate(order)}
+    return sorted(items, key=lambda item: rank.get(provider_key(pick(item)), len(order)))
+
+
+def sort_groups_by_provider(entries, order):
+    """按 relays.order 给策略组/清单项排序：组名里出现来源名的即归该来源。"""
+    if not order:
+        return list(entries)
+
+    def rank(entry):
+        text = str(entry.get("name", "") if isinstance(entry, dict) else entry).lower()
+        for index, name in enumerate(order):
+            if name and name in text:
+                return index
+        return len(order)
+
+    return sorted(entries, key=rank)
+
+
 def build_chain_pool(relays_cfg):
     """前置节点池：具名节点直接用原名，订阅节点内联为隐藏静态节点。
 
@@ -440,6 +482,10 @@ def build_chain_pool(relays_cfg):
             hidden = copy.deepcopy(node)
             hidden["name"] = HIDDEN_NODE_PREFIX + display
             pool.append((display, hidden, True))
+
+    order = resolve_provider_order(relays_cfg)
+    if order:
+        pool = order_by_provider(pool, order, lambda item: item[0])
 
     return pool
 
@@ -532,7 +578,8 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
             aux_groups.append({"name": pick_name, "type": "select", "proxies": list(combo_names)})
             group_order.append(pick_name)
         else:
-            group_order.extend(combo_names)
+            # 扁平模式：原出口已在主组首条，去重避免重复项
+            group_order.extend([name for name in combo_names if name != exit_name])
 
     return expanded, hidden, aux_groups, group_order
 
@@ -580,8 +627,13 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合"
             f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个组合策略组）")
 
-    relay_subs = relays_cfg.get("subscriptions", []) or []
-    relay_custom = relays_cfg.get("custom_proxies", []) or []
+    provider_order = resolve_provider_order(relays_cfg)
+    relay_subs = order_by_provider(
+        relays_cfg.get("subscriptions", []) or [], provider_order,
+        lambda item: item.get("name", "") if isinstance(item, dict) else "")
+    relay_custom = order_by_provider(
+        relays_cfg.get("custom_proxies", []) or [], provider_order,
+        lambda item: item.get("name", "") if isinstance(item, dict) else "")
 
     all_proxies = []
     claude_custom_names = []
@@ -794,16 +846,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             custom_routing_groups.append(grp_dict)
 
     relay_proxies_summary = ["⚡ 自动择优", "🛟 Fallback"]
+    provider_entries = []
     for s in relay_subs:
         name = s.get("name", "")
         emoji = s.get("emoji", "✈️")
-        relay_proxies_summary.extend([f"⚡ {name} 自动择优", f"{emoji} {name}"])
-    for g in custom_auto_groups:
-        if g["name"] not in relay_proxies_summary:
-            relay_proxies_summary.append(g["name"])
-    for g in custom_select_groups:
-        if g["name"] not in relay_proxies_summary:
-            relay_proxies_summary.append(g["name"])
+        provider_entries.extend([f"⚡ {name} 自动择优", f"{emoji} {name}"])
+    provider_entries.extend([g["name"] for g in custom_auto_groups])
+    provider_entries.extend([g["name"] for g in custom_select_groups])
+    relay_proxies_summary.extend(sort_groups_by_provider(provider_entries, provider_order))
     relay_proxies_summary.extend(relay_custom_names)
 
     groups = config.get("proxy-groups", [])
@@ -865,8 +915,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             g["timeout"] = DEFAULT_TIMEOUT
             g["tolerance"] = DEFAULT_TOLERANCE
             new_groups.append(g)
-            new_groups.extend(airport_auto_groups)
-            new_groups.extend(custom_auto_groups)
+            new_groups.extend(sort_groups_by_provider(
+                airport_auto_groups + custom_auto_groups, provider_order))
 
         elif g_name == "🛟 Fallback":
             if custom_fallback_def:
@@ -908,8 +958,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
 
         elif g_name == "🎮 Steam":
             new_groups.append(g)
-            new_groups.extend(airport_select_groups)
-            new_groups.extend(custom_select_groups)
+            new_groups.extend(sort_groups_by_provider(
+                airport_select_groups + custom_select_groups, provider_order))
 
         elif g_name in region_regexes:
             if relay_provider_ids:
@@ -980,8 +1030,13 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
 
     use_relay_chain = claude_cfg.get("use_relay_chain", False)
     claude_custom = claude_cfg.get("custom_proxies", []) or []
-    relay_subs = relays_cfg.get("subscriptions", []) or []
-    relay_custom = relays_cfg.get("custom_proxies", []) or []
+    provider_order = resolve_provider_order(relays_cfg)
+    relay_subs = order_by_provider(
+        relays_cfg.get("subscriptions", []) or [], provider_order,
+        lambda item: item.get("name", "") if isinstance(item, dict) else "")
+    relay_custom = order_by_provider(
+        relays_cfg.get("custom_proxies", []) or [], provider_order,
+        lambda item: item.get("name", "") if isinstance(item, dict) else "")
 
     # 1. 生成自定义节点行
     proxy_lines = []
