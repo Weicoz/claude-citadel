@@ -505,6 +505,10 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
                 hidden_seen.add(node["name"])
                 hidden.append(node)
 
+        # 出口自身也是一条链路：「🔀 中转节点 → 出口」。漏掉它，择优/回退/链路
+        # 清单里就只剩「机场节点 → 出口」，无法选中默认中转这条路径。
+        combo_names.insert(0, exit_name)
+
         if not combo_names:
             continue
 
