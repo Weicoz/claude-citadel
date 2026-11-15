@@ -236,7 +236,11 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         # 4. 验证 Surge / Loon / SR / QX 包含组网节点且 Apple/Steam 包含区域节点
         surge_out = build_ini_based_client(self.surge_tpl, profile, client_type="surge")
         self.assertIn("EasyTier SOCKS5", surge_out)
-        self.assertIn("🕸️ 组网访问 = select, DIRECT, EasyTier SOCKS5", surge_out)
+        # 组网节点必须是默认项，DIRECT 只作兜底排在末尾，否则规则命中后仍走直连
+        self.assertIn("🕸️ 组网访问 = select, EasyTier SOCKS5, DIRECT", surge_out)
+        mesh = next(g for g in cfg_clash["proxy-groups"] if g["name"] == "🕸️ 组网访问")
+        self.assertEqual(mesh["proxies"][0], "EasyTier SOCKS5", "组网组默认项不能是 DIRECT")
+        self.assertEqual(mesh["proxies"][-1], "DIRECT")
         self.assertIn("🍎 Apple = select, DIRECT, 🔀 中转节点, ⚡ 自动择优, 🇭🇰 香港节点, 🇯🇵 日本节点, 🇺🇸 美国节点, 🇸🇬 新加坡节点, 🇹🇼 台湾节点", surge_out)
 
     def test_per_node_dialer_proxy_and_custom_hop(self):

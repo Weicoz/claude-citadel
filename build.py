@@ -784,7 +784,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                 grp_dict["filter"] = g_def["filter"]
             custom_select_groups.append(grp_dict)
         else:
-            proxies_list = ["DIRECT"] + [n for n in g_nodes if n != "DIRECT"] if g_nodes else ["DIRECT"]
+            # DIRECT 只作为兜底放在末尾：放首位会变成默认项，带规则的自定义组会静默走直连
+            proxies_list = [n for n in g_nodes if n != "DIRECT"] + ["DIRECT"] if g_nodes else ["DIRECT"]
             grp_dict["proxies"] = proxies_list
             custom_routing_groups.append(grp_dict)
 
@@ -1155,7 +1156,8 @@ def build_ini_based_client(template_path, profile_data, client_type="surge"):
                         g_nodes.append(p_name)
 
             if has_rules and "DIRECT" not in g_nodes:
-                g_nodes = ["DIRECT"] + g_nodes if g_nodes else ["DIRECT"]
+                # 同上：DIRECT 放末尾，避免自定义路由组的默认项被直连顶掉
+                g_nodes = g_nodes + ["DIRECT"] if g_nodes else ["DIRECT"]
             elif not g_nodes:
                 g_nodes = ["DIRECT"]
 
