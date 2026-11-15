@@ -169,6 +169,8 @@ rules:
 - DOMAIN-SUFFIX,myip.com,🇺🇸 海外出口
 - DOMAIN,cp.cloudflare.com,DIRECT
 - DOMAIN-SUFFIX,cloudflare.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,cloudflare-dns.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,cloudflarestatus.com,🇺🇸 海外出口
 - PROCESS-NAME,claude,🇺🇸 海外出口
 - PROCESS-NAME,Claude,🇺🇸 海外出口
 - PROCESS-NAME,claude.exe,🇺🇸 海外出口

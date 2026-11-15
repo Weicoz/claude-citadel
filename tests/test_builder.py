@@ -123,13 +123,19 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                 if client == "qx":
                     cp_rule = "host, cp.cloudflare.com, direct"
                     cf_rule = "host-suffix, cloudflare.com, 🇺🇸 海外出口"
+                    cf_extra = ("host-suffix, cloudflare-dns.com, 🇺🇸 海外出口",
+                                "host-suffix, cloudflarestatus.com, 🇺🇸 海外出口")
                     amy_rule = "host-suffix, amytele.co, 🌐 海外服务"
                 else:
                     cp_rule = "DOMAIN,cp.cloudflare.com,DIRECT"
                     cf_rule = "DOMAIN-SUFFIX,cloudflare.com,🇺🇸 海外出口"
+                    cf_extra = ("DOMAIN-SUFFIX,cloudflare-dns.com,🇺🇸 海外出口",
+                                "DOMAIN-SUFFIX,cloudflarestatus.com,🇺🇸 海外出口")
                     amy_rule = "DOMAIN-SUFFIX,amytele.co,🌐 海外服务"
                 self.assertEqual(rules.count(cp_rule), 1)
                 self.assertEqual(rules.count(cf_rule), 1)
+                for extra in cf_extra:
+                    self.assertEqual(rules.count(extra), 1)
                 self.assertEqual(rules.count(amy_rule), 1)
                 self.assertLess(rules.index(cp_rule), rules.index(cf_rule))
 
