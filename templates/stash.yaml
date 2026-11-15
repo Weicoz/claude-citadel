@@ -158,7 +158,7 @@ proxy-groups:
 rules:
 - DOMAIN,cdn.jsdelivr.net,🌐 海外服务
 - DOMAIN,unpkg.com,🌐 海外服务
-- DOMAIN,cdnjs.cloudflare.com,🌐 海外服务
+- DOMAIN-SUFFIX,amytele.co,🌐 海外服务
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
@@ -167,6 +167,8 @@ rules:
 - DOMAIN-SUFFIX,ipinfo.io,🇺🇸 海外出口
 - DOMAIN-SUFFIX,icanhazip.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,myip.com,🇺🇸 海外出口
+- DOMAIN,cp.cloudflare.com,DIRECT
+- DOMAIN-SUFFIX,cloudflare.com,🇺🇸 海外出口
 - PROCESS-NAME,claude,🇺🇸 海外出口
 - PROCESS-NAME,Claude,🇺🇸 海外出口
 - PROCESS-NAME,claude.exe,🇺🇸 海外出口

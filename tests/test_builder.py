@@ -96,8 +96,8 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertIn("host-suffix, custom-claude-api.com, 🇺🇸 海外出口", qx_out)
 
     def test_shared_cdns_use_overseas_service_before_claude(self):
-        """共享 CDN 优先走海外服务，避免被 Claude 进程或远端规则覆盖。"""
-        hosts = ("cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com")
+        """共享 CDN 优先走海外服务；Cloudflare 自有域走海外出口，测速域直连。"""
+        hosts = ("cdn.jsdelivr.net", "unpkg.com")
         dedicated = yaml.safe_load((ROOT / "rules/claude.yaml").read_text())["payload"]
         plain = [line for line in (ROOT / "rules/claude.list").read_text().splitlines()
                  if line and not line.startswith("#")]
@@ -120,6 +120,18 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                             else f"DOMAIN,{host},🌐 海外服务")
                     self.assertEqual(rules.count(rule), 1)
                     self.assertLess(rules.index(rule), guard)
+                if client == "qx":
+                    cp_rule = "host, cp.cloudflare.com, direct"
+                    cf_rule = "host-suffix, cloudflare.com, 🇺🇸 海外出口"
+                    amy_rule = "host-suffix, amytele.co, 🌐 海外服务"
+                else:
+                    cp_rule = "DOMAIN,cp.cloudflare.com,DIRECT"
+                    cf_rule = "DOMAIN-SUFFIX,cloudflare.com,🇺🇸 海外出口"
+                    amy_rule = "DOMAIN-SUFFIX,amytele.co,🌐 海外服务"
+                self.assertEqual(rules.count(cp_rule), 1)
+                self.assertEqual(rules.count(cf_rule), 1)
+                self.assertEqual(rules.count(amy_rule), 1)
+                self.assertLess(rules.index(cp_rule), rules.index(cf_rule))
 
     def test_relay_order_priority(self):
         """relays.order 决定链路组合与机场组顺序，未列出的来源排在最后。"""
