@@ -452,7 +452,9 @@ def expand_chain_exits(claude_custom, pool):
         combo_names = []
         for display, node in pool:
             combo = copy.deepcopy(p)
-            for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via"]:
+            # 组合条目由策略组统一测速，出口自带的单点测速字段没有意义，裁掉可省约 10% 体积
+            for key in ["dialer-proxy", "relay", "underlying-proxy", "underlying_proxy", "chain", "via",
+                        "benchmark-url", "benchmark-timeout"]:
                 combo.pop(key, None)
             combo["name"] = f"{display} → {exit_name}"
             combo["dialer-proxy"] = node["name"]
@@ -465,9 +467,10 @@ def expand_chain_exits(claude_custom, pool):
         if not combo_names:
             continue
 
-        # 同一出口的全部固定链路：一个自动择优（取最快）、一个 Fallback（取首个存活）
+        # 同一出口的全部固定链路：自动择优（取最快）、Fallback（取首个存活）、链路清单（手动挑）
         auto_name = f"⚡ {exit_name} 自动择优"
         fallback_name = f"🛟 {exit_name} Fallback"
+        list_name = f"📍 {exit_name} 链路"
         probe = {
             "url": DEFAULT_PROBE_URL,
             "expected-status": DEFAULT_EXPECTED_STATUS,
@@ -479,8 +482,9 @@ def expand_chain_exits(claude_custom, pool):
                                 "tolerance": DEFAULT_TOLERANCE, "proxies": list(combo_names)}, **probe))
         aux_groups.append(dict({"name": fallback_name, "type": "fallback", "lazy": True,
                                 "proxies": list(combo_names)}, **probe))
-        group_order.extend([auto_name, fallback_name])
-        group_order.extend(combo_names)
+        # 链路清单收进子组，避免几百条条目把主列表撑爆
+        aux_groups.append({"name": list_name, "type": "select", "proxies": list(combo_names)})
+        group_order.extend([auto_name, fallback_name, list_name])
 
     return expanded, hidden, aux_groups, group_order
 
@@ -525,7 +529,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
         claude_custom, chain_hidden, chain_groups, chain_order = expand_chain_exits(claude_custom, chain_pool)
         combo_count = len(claude_custom) - exit_count
         log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合"
-            f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个自动择优/Fallback 组）")
+            f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个组合策略组）")
 
     relay_subs = relays_cfg.get("subscriptions", []) or []
     relay_custom = relays_cfg.get("custom_proxies", []) or []

@@ -698,19 +698,24 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
         group = next(g for g in config["proxy-groups"] if g["name"] == "🇺🇸 海外出口")
         names = group["proxies"]
-        # 3 个前置节点 × 2 个出口 = 6 条组合，加 2 条原出口与 4 个自动择优/Fallback 组
-        self.assertEqual(len(names), 12, f"组内条目数不符: {names}")
-        # 按出口分块：原出口 → 自动择优 → Fallback → 该出口的组合条目
+        # 每个出口 4 条：原出口 → 自动择优 → Fallback → 链路子组；组合条目不再直接铺进主组
+        self.assertEqual(len(names), 8, f"组内条目数不符: {names}")
         self.assertEqual(names[0], "波特兰 SOCKS5")
         self.assertEqual(names[1], "⚡ 波特兰 SOCKS5 自动择优")
         self.assertEqual(names[2], "🛟 波特兰 SOCKS5 Fallback")
-        self.assertEqual(names[3], "🇯🇵 自建日本直连 → 波特兰 SOCKS5")
-        self.assertEqual(names[4], "[猫咪云] 香港-01 → 波特兰 SOCKS5")
-        # 订阅节点名已带前缀时不得重复拼接
-        self.assertEqual(names[5], "[猫咪云] 澳门-01 → 波特兰 SOCKS5")
-        self.assertEqual(names[6], "波特兰 HTTP")
+        self.assertEqual(names[3], "📍 波特兰 SOCKS5 链路")
+        self.assertEqual(names[4], "波特兰 HTTP")
 
         groups = {g["name"]: g for g in config["proxy-groups"]}
+        link = groups["📍 波特兰 SOCKS5 链路"]
+        self.assertEqual(link["type"], "select")
+        # 3 个前置节点 → 3 条组合；订阅节点名已带前缀时不得重复拼接
+        self.assertEqual(link["proxies"], [
+            "🇯🇵 自建日本直连 → 波特兰 SOCKS5",
+            "[猫咪云] 香港-01 → 波特兰 SOCKS5",
+            "[猫咪云] 澳门-01 → 波特兰 SOCKS5",
+        ])
+
         auto = groups["⚡ 波特兰 SOCKS5 自动择优"]
         self.assertEqual(auto["type"], "url-test")
         self.assertEqual(len(auto["proxies"]), 3, "自动择优组应覆盖该出口的全部组合")
@@ -725,6 +730,7 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         proxies = {p["name"]: p for p in config["proxies"]}
         self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "⛓ [猫咪云] 香港-01")
         self.assertEqual(proxies["🇯🇵 自建日本直连 → 波特兰 SOCKS5"]["dialer-proxy"], "🇯🇵 自建日本直连")
+        self.assertNotIn("benchmark-url", proxies["🇯🇵 自建日本直连 → 波特兰 SOCKS5"], "组合条目应裁掉单点测速字段")
         self.assertIn("⛓ [猫咪云] 香港-01", proxies, "订阅节点未内联为隐藏静态节点")
 
         # 内联节点不得混入中转池，避免污染测速与地区组
