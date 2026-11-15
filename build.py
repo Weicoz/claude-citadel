@@ -474,9 +474,10 @@ def expand_chain_exits(claude_custom, pool):
             "interval": DEFAULT_STANDBY_INTERVAL,
             "timeout": DEFAULT_TIMEOUT,
         }
-        aux_groups.append(dict({"name": auto_name, "type": "url-test",
+        # lazy: 只有该组被选中时才探测成员，避免 139 条链路在后台空转
+        aux_groups.append(dict({"name": auto_name, "type": "url-test", "lazy": True,
                                 "tolerance": DEFAULT_TOLERANCE, "proxies": list(combo_names)}, **probe))
-        aux_groups.append(dict({"name": fallback_name, "type": "fallback",
+        aux_groups.append(dict({"name": fallback_name, "type": "fallback", "lazy": True,
                                 "proxies": list(combo_names)}, **probe))
         group_order.extend([auto_name, fallback_name])
         group_order.extend(combo_names)

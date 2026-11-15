@@ -717,6 +717,8 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertIn("[猫咪云] 澳门-01 → 波特兰 SOCKS5", auto["proxies"])
         fallback = groups["🛟 波特兰 SOCKS5 Fallback"]
         self.assertEqual(fallback["type"], "fallback")
+        self.assertTrue(auto.get("lazy"), "自动择优组应开启 lazy，避免后台空转")
+        self.assertTrue(fallback.get("lazy"), "Fallback 组应开启 lazy，避免后台空转")
         self.assertEqual(fallback["proxies"], auto["proxies"], "Fallback 与自动择优成员应一致")
         self.assertNotIn("波特兰 SOCKS5", fallback["proxies"], "原出口条目不得进入组合组")
 
