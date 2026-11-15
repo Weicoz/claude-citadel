@@ -434,11 +434,41 @@ def build_chain_pool(relays_cfg):
     return pool
 
 
-def expand_chain_exits(claude_custom, pool):
-    """按出口分块展开：原出口 → 该出口的自动择优/Fallback → 全部固定链路。
+def resolve_chain_group_options(chain_cfg):
+    """解析 claude_exits.chain_groups 的可选配置，缺省值等于仓库默认行为。"""
+    cfg = chain_cfg if isinstance(chain_cfg, dict) else {}
+    probe_cfg = cfg.get("probe") if isinstance(cfg.get("probe"), dict) else {}
+    names_cfg = cfg.get("names") if isinstance(cfg.get("names"), dict) else {}
+
+    def pick(value, default):
+        return default if value is None or value == "" else value
+
+    return {
+        "auto_select": bool(pick(cfg.get("auto_select"), True)),
+        "fallback": bool(pick(cfg.get("fallback"), True)),
+        "picker": bool(pick(cfg.get("picker"), True)),
+        "lazy": bool(pick(cfg.get("lazy"), True)),
+        "tolerance": int(pick(probe_cfg.get("tolerance"), DEFAULT_TOLERANCE)),
+        "probe": {
+            "url": pick(probe_cfg.get("url"), DEFAULT_PROBE_URL),
+            "expected-status": str(pick(probe_cfg.get("expected_status"), DEFAULT_EXPECTED_STATUS)),
+            "interval": int(pick(probe_cfg.get("interval"), DEFAULT_STANDBY_INTERVAL)),
+            "timeout": int(pick(probe_cfg.get("timeout"), DEFAULT_TIMEOUT)),
+        },
+        "names": {
+            "auto_select": pick(names_cfg.get("auto_select"), "⚡ {exit} 自动择优"),
+            "fallback": pick(names_cfg.get("fallback"), "🛟 {exit} Fallback"),
+            "picker": pick(names_cfg.get("picker"), "📍 {exit} 链路"),
+        },
+    }
+
+
+def expand_chain_exits(claude_custom, pool, chain_cfg=None):
+    """按出口分块展开：原出口 → 自动择优 / Fallback → 链路清单或全部固定链路。
 
     返回 (条目列表, 隐藏节点列表, 新增策略组, 出口组内的条目顺序)。
     """
+    opts = resolve_chain_group_options(chain_cfg)
     expanded, hidden, aux_groups, group_order = [], [], [], []
     hidden_seen = set()
 
@@ -467,24 +497,27 @@ def expand_chain_exits(claude_custom, pool):
         if not combo_names:
             continue
 
-        # 同一出口的全部固定链路：自动择优（取最快）、Fallback（取首个存活）、链路清单（手动挑）
-        auto_name = f"⚡ {exit_name} 自动择优"
-        fallback_name = f"🛟 {exit_name} Fallback"
-        list_name = f"📍 {exit_name} 链路"
-        probe = {
-            "url": DEFAULT_PROBE_URL,
-            "expected-status": DEFAULT_EXPECTED_STATUS,
-            "interval": DEFAULT_STANDBY_INTERVAL,
-            "timeout": DEFAULT_TIMEOUT,
-        }
-        # lazy: 只有该组被选中时才探测成员，避免 139 条链路在后台空转
-        aux_groups.append(dict({"name": auto_name, "type": "url-test", "lazy": True,
-                                "tolerance": DEFAULT_TOLERANCE, "proxies": list(combo_names)}, **probe))
-        aux_groups.append(dict({"name": fallback_name, "type": "fallback", "lazy": True,
-                                "proxies": list(combo_names)}, **probe))
-        # 链路清单收进子组，避免几百条条目把主列表撑爆
-        aux_groups.append({"name": list_name, "type": "select", "proxies": list(combo_names)})
-        group_order.extend([auto_name, fallback_name, list_name])
+        if opts["auto_select"]:
+            auto_name = opts["names"]["auto_select"].format(exit=exit_name)
+            aux_groups.append(dict(
+                {"name": auto_name, "type": "url-test", "lazy": opts["lazy"],
+                 "tolerance": opts["tolerance"], "proxies": list(combo_names)}, **opts["probe"]))
+            group_order.append(auto_name)
+
+        if opts["fallback"]:
+            fallback_name = opts["names"]["fallback"].format(exit=exit_name)
+            aux_groups.append(dict(
+                {"name": fallback_name, "type": "fallback", "lazy": opts["lazy"],
+                 "proxies": list(combo_names)}, **opts["probe"]))
+            group_order.append(fallback_name)
+
+        if opts["picker"]:
+            # 链路清单收进子组，避免几百条条目把主列表撑爆
+            pick_name = opts["names"]["picker"].format(exit=exit_name)
+            aux_groups.append({"name": pick_name, "type": "select", "proxies": list(combo_names)})
+            group_order.append(pick_name)
+        else:
+            group_order.extend(combo_names)
 
     return expanded, hidden, aux_groups, group_order
 
@@ -526,7 +559,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     if claude_cfg.get("chain_all_relay_nodes"):
         chain_pool = build_chain_pool(relays_cfg)
         exit_count = len([p for p in claude_custom if isinstance(p, dict) and p.get("name")])
-        claude_custom, chain_hidden, chain_groups, chain_order = expand_chain_exits(claude_custom, chain_pool)
+        claude_custom, chain_hidden, chain_groups, chain_order = expand_chain_exits(
+            claude_custom, chain_pool, claude_cfg.get("chain_groups"))
         combo_count = len(claude_custom) - exit_count
         log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合"
             f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个组合策略组）")

@@ -737,6 +737,61 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         relay_group = next(g for g in config["proxy-groups"] if g["name"] == "🔀 中转节点")
         self.assertNotIn("⛓ [猫咪云] 香港-01", relay_group.get("proxies") or [])
 
+    def test_chain_groups_configurable(self):
+        """chain_groups 可自定义命名与探测参数，也可逐个关闭。"""
+        from unittest import mock
+        import build as build_module
+
+        base = {
+            "claude_exits": {
+                "chain_all_relay_nodes": True,
+                "use_relay_chain": True,
+                "custom_proxies": [
+                    {"name": "波特兰 SOCKS5", "type": "socks5", "server": "198.51.100.1", "port": 1080}
+                ],
+            },
+            "relays": {
+                "custom_proxies": [
+                    {"name": "🇯🇵 自建日本直连", "type": "ss", "server": "198.51.100.2", "port": 8388}
+                ]
+            },
+        }
+        fake_nodes = [{"name": "香港-01", "type": "ss", "server": "198.51.100.3", "port": 8388}]
+
+        custom = {
+            "chain_groups": {
+                "names": {"auto_select": "FAST {exit}", "fallback": "FB {exit}", "picker": "PICK {exit}"},
+                "probe": {"url": "https://probe.example.com", "expected_status": "200",
+                          "interval": 600, "timeout": 2500, "tolerance": 50},
+                "lazy": False,
+            }
+        }
+        profile = {**base, "claude_exits": {**base["claude_exits"], **custom}}
+        with mock.patch.object(build_module, "fetch_subscription_nodes", return_value=fake_nodes):
+            config = build_clash_stash(self.clash_tpl, profile, "clash")
+
+        groups = {g["name"]: g for g in config["proxy-groups"]}
+        exit_group = groups["🇺🇸 海外出口"]["proxies"]
+        self.assertEqual(exit_group, ["波特兰 SOCKS5", "FAST 波特兰 SOCKS5", "FB 波特兰 SOCKS5",
+                                      "PICK 波特兰 SOCKS5"])
+        auto = groups["FAST 波特兰 SOCKS5"]
+        self.assertEqual(auto["url"], "https://probe.example.com")
+        self.assertEqual(auto["expected-status"], "200")
+        self.assertEqual(auto["interval"], 600)
+        self.assertEqual(auto["timeout"], 2500)
+        self.assertEqual(auto["tolerance"], 50)
+        self.assertFalse(auto.get("lazy"), "lazy 关闭后不应写入该字段")
+
+        # 三个组全关时退回扁平列表，行为等同未分层
+        flat = {
+            "chain_groups": {"auto_select": False, "fallback": False, "picker": False},
+        }
+        profile = {**base, "claude_exits": {**base["claude_exits"], **flat}}
+        with mock.patch.object(build_module, "fetch_subscription_nodes", return_value=fake_nodes):
+            config = build_clash_stash(self.clash_tpl, profile, "clash")
+        exit_group = next(g for g in config["proxy-groups"] if g["name"] == "🇺🇸 海外出口")["proxies"]
+        self.assertEqual(exit_group, ["波特兰 SOCKS5", "🇯🇵 自建日本直连 → 波特兰 SOCKS5"])
+
     def test_chain_all_relay_nodes_default_off(self):
         """未开启开关时，出口组保持原样，不拉订阅、不生成组合。"""
         profile = {
