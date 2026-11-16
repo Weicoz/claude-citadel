@@ -145,6 +145,31 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                     self.assertEqual(rules.count(t3_rule), 1)
                 self.assertLess(rules.index(cp_rule), rules.index(cf_rule))
 
+    def test_kazumi_sources_split_by_domestic_reachability(self):
+        """Kazumi 源按国内直连可达性分流：可达走直连，仅代理可达走海外服务。"""
+        direct = ("baimaodm.com", "girigirilove.com", "dmbus.cc", "xfdm.pro", "xifanacg.com",
+                  "dcc3.com", "dmmiku.com", "vdm5.com", "moonci.com", "mwcy.net", "agedm.io",
+                  "lmm85.com", "2kdm.com", "akianime.cc", "dalvdm.cc", "ezdmw.org", "sorani.net")
+        proxied = ("7sefun.top", "omofun03.top", "libvio.cc", "libvio.site", "mgnacg.com")
+        for client in ("clash", "stash", "surge", "loon", "shadowrocket", "qx"):
+            with self.subTest(client=client):
+                if client in ("clash", "stash"):
+                    rules = build_clash_stash(TEMPLATES_DIR / f"{client}.yaml", {}, client)["rules"]
+                else:
+                    output = build_ini_based_client(TEMPLATES_DIR / f"{client}.conf", {}, client)
+                    section = "[filter_local]" if client == "qx" else "[Rule]"
+                    rules = output.split(section, 1)[1].splitlines()
+                if client == "qx":
+                    for domain in direct:
+                        self.assertEqual(rules.count(f"host-suffix, {domain}, direct"), 1, domain)
+                    for domain in proxied:
+                        self.assertEqual(rules.count(f"host-suffix, {domain}, 🌐 海外服务"), 1, domain)
+                else:
+                    for domain in direct:
+                        self.assertEqual(rules.count(f"DOMAIN-SUFFIX,{domain},DIRECT"), 1, domain)
+                    for domain in proxied:
+                        self.assertEqual(rules.count(f"DOMAIN-SUFFIX,{domain},🌐 海外服务"), 1, domain)
+
     def test_relay_order_priority(self):
         """relays.order 决定链路组合与机场组顺序，未列出的来源排在最后。"""
         profile = {
