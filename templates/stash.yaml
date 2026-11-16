@@ -159,6 +159,9 @@ rules:
 - DOMAIN,cdn.jsdelivr.net,🌐 海外服务
 - DOMAIN,unpkg.com,🌐 海外服务
 - DOMAIN-SUFFIX,amytele.co,🌐 海外服务
+- DOMAIN-SUFFIX,t3.codes,🌐 海外服务
+- DOMAIN-SUFFIX,t3.chat,🌐 海外服务
+- DOMAIN-SUFFIX,argotunnel.com,🌐 海外服务
 - DOMAIN-SUFFIX,claude.ai,🇺🇸 海外出口
 - DOMAIN-SUFFIX,anthropic.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,claude.com,🇺🇸 海外出口
