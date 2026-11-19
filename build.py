@@ -24,6 +24,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 import yaml
 
@@ -371,6 +372,9 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type=
 # dialer-proxy 只在配置解析阶段按名字查静态节点，proxy-providers 注入的节点此时还不存在，
 # 所以订阅节点必须内联成隐藏静态节点（⛓ 前缀），否则 mihomo 会报 dialer-proxy not found。
 _SUBSCRIPTION_NODE_CACHE = {}
+# 订阅拉取重试次数与首次退避秒数（按次数线性递增）
+SUB_FETCH_ATTEMPTS = 4
+SUB_FETCH_BACKOFF = 1.5
 _EXCLUDE_PROXY_TYPES = set(DEFAULT_EXCLUDE_TYPES.split("|"))
 _EXCLUDE_NAME_RE = re.compile(DEFAULT_EXCLUDE_FILTER)
 
@@ -386,12 +390,22 @@ def fetch_subscription_nodes(sub, timeout=30):
 
     label = sub.get("name", "未命名订阅")
     headers = {"User-Agent": sub.get("user_agent") or DEFAULT_SUB_USER_AGENT}
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = yaml.safe_load(resp.read())
-    except Exception as e:
-        log(f"订阅 {label} 拉取失败，跳过其链路组合：{e}", "WARN")
+    data = None
+    last_err = None
+    # 机场前置的 Cloudflare / Caddy 偶发 TLS 断连，单次失败不代表订阅失效，重试后再判定
+    for attempt in range(1, SUB_FETCH_ATTEMPTS + 1):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = yaml.safe_load(resp.read())
+            break
+        except Exception as e:
+            last_err = e
+            if attempt < SUB_FETCH_ATTEMPTS:
+                log(f"订阅 {label} 第 {attempt} 次拉取失败（{e}），{SUB_FETCH_BACKOFF:.1f}s 后重试...", "WARN")
+                time.sleep(SUB_FETCH_BACKOFF * attempt)
+    if data is None:
+        log(f"订阅 {label} 拉取失败，跳过其链路组合：{last_err}", "WARN")
         _SUBSCRIPTION_NODE_CACHE[cache_key] = None
         return None
 
