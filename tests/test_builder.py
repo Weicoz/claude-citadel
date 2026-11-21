@@ -628,7 +628,10 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         for name, rp in stash_cfg["rule-providers"].items():
             if name.startswith(("claude-citadel-custom-", "claude-citadel-diy-")):
                 continue  # 用户自定义远端规则集保持原地址
-            self.assertIn("cdn.jsdelivr.net", rp["url"], f"stash {name} 未使用镜像地址")
+            # cdn.jsdelivr.net 在国内网络常被阻断，Stash 又无法为 rule-providers 指定代理，
+            # 因此统一走 Stash 官方文档示例使用的 fastly.jsdelivr.net 镜像。
+            self.assertIn("fastly.jsdelivr.net", rp["url"], f"stash {name} 未使用 fastly 镜像")
+            self.assertNotIn("cdn.jsdelivr.net", rp["url"], f"stash {name} 仍指向 cdn.jsdelivr.net")
 
         # ipcidr 规则集必须带 no-resolve，避免无谓解析
         for name in ("claude-citadel-telegram", "claude-citadel-cn-ip"):
@@ -641,6 +644,13 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         # Stash 不支持 rule-providers 的 proxy 字段
         for rp_name, rp in stash_cfg["rule-providers"].items():
             self.assertNotIn("proxy", rp, f"Stash {rp_name} 不应包含 proxy 字段")
+
+        # 规则集镜像必须直连，且在 gfw 等 RULE-SET 之前命中，避免规则集下载依赖机场节点存活
+        stash_rules = stash_cfg["rules"]
+        self.assertIn("DOMAIN,fastly.jsdelivr.net,DIRECT", stash_rules, "stash 缺少规则集镜像直连规则")
+        mirror_idx = stash_rules.index("DOMAIN,fastly.jsdelivr.net,DIRECT")
+        gfw_idx = next(i for i, r in enumerate(stash_rules) if r.startswith("RULE-SET,claude-citadel-gfw,"))
+        self.assertLess(mirror_idx, gfw_idx, "stash 规则集镜像直连规则被 gfw 规则集抢先命中")
 
 
     def test_ini_remote_rules_order(self):

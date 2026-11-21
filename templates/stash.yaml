@@ -174,6 +174,9 @@ rules:
 - DOMAIN-SUFFIX,ezdmw.org,DIRECT
 - DOMAIN-SUFFIX,sorani.net,DIRECT
 - DOMAIN,cdn.jsdelivr.net,🌐 海外服务
+# 规则集镜像走直连：Stash 不支持给 rule-providers 指定代理，桌面端也保持一致，
+# 避免「规则集下载依赖机场节点存活」造成的空规则集（启动即拉取、拉取失败即空）。
+- DOMAIN,fastly.jsdelivr.net,DIRECT
 - DOMAIN,unpkg.com,🌐 海外服务
 - DOMAIN-SUFFIX,amytele.co,🌐 海外服务
 - DOMAIN-SUFFIX,t3.codes,🌐 海外服务
@@ -251,96 +254,96 @@ rule-providers:
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-claude.yaml
-    url: https://cdn.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/claude.yaml
+    url: https://fastly.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/claude.yaml
     interval: 86400
   claude-citadel-direct-supplement:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-direct-supplement.yaml
-    url: https://cdn.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/public_direct_supplement.yaml
+    url: https://fastly.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/public_direct_supplement.yaml
     interval: 86400
   claude-citadel-proxy-supplement:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-proxy-supplement.yaml
-    url: https://cdn.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/public_proxy_supplement.yaml
+    url: https://fastly.jsdelivr.net/gh/Weicoz/claude-citadel@main/rules/public_proxy_supplement.yaml
     interval: 86400
   claude-citadel-openai:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-openai.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/OpenAI/OpenAI.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/OpenAI/OpenAI.yaml
     interval: 86400
   claude-citadel-google-ai:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-google-ai.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Gemini/Gemini.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Gemini/Gemini.yaml
     interval: 86400
   claude-citadel-telegram:
     type: http
     behavior: ipcidr
     format: yaml
     path: ./ruleset/claude-citadel-telegram.txt
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt
+    url: https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt
     interval: 86400
   claude-citadel-apple:
     type: http
     behavior: domain
     format: yaml
     path: ./ruleset/claude-citadel-apple.txt
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt
+    url: https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt
     interval: 86400
   claude-citadel-microsoft:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-microsoft.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Microsoft/Microsoft.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Microsoft/Microsoft.yaml
     interval: 86400
   claude-citadel-steam:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-steam.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Steam/Steam.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Steam/Steam.yaml
     interval: 86400
   claude-citadel-discord:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-discord.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Discord/Discord.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Discord/Discord.yaml
     interval: 86400
   claude-citadel-mail:
     type: http
     behavior: classical
     format: yaml
     path: ./ruleset/claude-citadel-mail.yaml
-    url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Mail/Mail.yaml
+    url: https://fastly.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Mail/Mail.yaml
     interval: 86400
   claude-citadel-gfw:
     type: http
     behavior: domain
     format: yaml
     path: ./ruleset/claude-citadel-gfw.txt
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt
+    url: https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt
     interval: 86400
   claude-citadel-direct:
     type: http
     behavior: domain
     format: yaml
     path: ./ruleset/claude-citadel-direct.txt
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt
+    url: https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt
     interval: 86400
   claude-citadel-cn-ip:
     type: http
     behavior: ipcidr
     format: yaml
     path: ./ruleset/claude-citadel-cn-ip.txt
-    url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt
+    url: https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt
     interval: 86400
