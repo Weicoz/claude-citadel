@@ -145,6 +145,32 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                     self.assertEqual(rules.count(t3_rule), 1)
                 self.assertLess(rules.index(cp_rule), rules.index(cf_rule))
 
+    def test_antigravity_hosts_follow_google_ai(self):
+        """agy/Gemini CLI 的 Google AI 域走 🚀 Google AI，不能落进 gfw 的 googleapis 通配。"""
+        domains = ("daily-cloudcode-pa.googleapis.com", "cloudcode-pa.googleapis.com",
+                   "antigravity-pa.googleapis.com", "antigravity.googleapis.com",
+                   "antigravity.google.com", "aicode.googleapis.com",
+                   "aiplatform.googleapis.com", "aistudio.google.com")
+        for client in ("clash", "stash", "surge", "loon", "shadowrocket", "qx"):
+            with self.subTest(client=client):
+                if client in ("clash", "stash"):
+                    rules = build_clash_stash(TEMPLATES_DIR / f"{client}.yaml", {}, client)["rules"]
+                    guard = next(i for i, rule in enumerate(rules)
+                                 if rule.startswith("RULE-SET,claude-citadel-gfw,"))
+                else:
+                    output = build_ini_based_client(TEMPLATES_DIR / f"{client}.conf", {}, client)
+                    section = "[filter_local]" if client == "qx" else "[Rule]"
+                    rules = output.split(section, 1)[1].splitlines()
+                    guard = None
+                for domain in domains:
+                    if client == "qx":
+                        rule = f"host-suffix, {domain}, 🚀 Google AI"
+                    else:
+                        rule = f"DOMAIN-SUFFIX,{domain},🚀 Google AI"
+                    self.assertEqual(rules.count(rule), 1, domain)
+                    if guard is not None:
+                        self.assertLess(rules.index(rule), guard, domain)
+
     def test_kazumi_sources_split_by_domestic_reachability(self):
         """Kazumi 源按国内直连可达性分流：可达走直连，仅代理可达走海外服务。"""
         direct = ("baimaodm.com", "girigirilove.com", "dmbus.cc", "xfdm.pro", "xifanacg.com",

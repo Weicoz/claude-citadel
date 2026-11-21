@@ -213,7 +213,7 @@ custom_rules:
 | :--- | :--- | :--- | :--- |
 | **Claude / Anthropic** | `claude.ai`、`anthropic.com`、桌面 Claude 进程 | `🇺🇸 海外出口` | 严格经由专用出口发出。若开启代理链，先由机场中转跳板连接出口，防止握手封锁。 |
 | **OpenAI / ChatGPT** | `openai.com`、`chatgpt.com`、API 域名 | `🤖 OpenAI` | 默认优先走 `🇺🇸 海外出口`，亦可手工切换为日/美/新/港节点或全局中转。 |
-| **Google AI** | `gemini.google.com`、`generativelanguage.googleapis.com` | `🚀 Google AI` | 默认优先走 `🇺🇸 海外出口` 或中转池。 |
+| **Google AI** | `gemini.google.com`、`generativelanguage.googleapis.com`、Gemini CLI / Antigravity（`cloudcode-pa.googleapis.com`、`daily-cloudcode-pa.googleapis.com`、`aicode.googleapis.com`、`antigravity.google.com`） | `🚀 Google AI` | 默认优先走 `🇺🇸 海外出口` 或中转池。`googleapis.com` 前缀域名不再被 gfw 规则集误吞到 `🌐 海外服务`。 |
 | **Apple 服务** | Apple 官方规则库、App Store、iCloud | `🍎 Apple` | 默认直连 `DIRECT`，可切 `🇭🇰 香港`、`🇯🇵 日本`、`🇺🇸 美国`、`🇸🇬 新加坡`、`🇹🇼 台湾`。 |
 | **Steam 游戏** | Steam 官方规则库、商店、CDN | `🎮 Steam` | 默认直连 `DIRECT`，下载不耗代理流量；可自由切换至日本/香港等低延迟节点。 |
 | **Telegram / 邮件** | Telegram 精确 CIDR、常见海外邮箱服务 | `✈️ Telegram` / `📧 邮件收件` | 自动择优中转出口。 |

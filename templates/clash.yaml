@@ -215,6 +215,14 @@ rules:
 - DOMAIN-SUFFIX,cloudflare.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,cloudflare-dns.com,🇺🇸 海外出口
 - DOMAIN-SUFFIX,cloudflarestatus.com,🇺🇸 海外出口
+- DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,cloudcode-pa.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,antigravity-pa.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,antigravity.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,antigravity.google.com,🚀 Google AI
+- DOMAIN-SUFFIX,aicode.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,aiplatform.googleapis.com,🚀 Google AI
+- DOMAIN-SUFFIX,aistudio.google.com,🚀 Google AI
 - PROCESS-NAME,claude,🇺🇸 海外出口
 - PROCESS-NAME,Claude,🇺🇸 海外出口
 - PROCESS-NAME,claude.exe,🇺🇸 海外出口
