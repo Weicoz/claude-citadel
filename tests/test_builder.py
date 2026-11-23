@@ -1089,5 +1089,24 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                 )
                 self.assertEqual(rules.count(apple_push_rule), 1, f"{client} 缺少或重复规则: {apple_push_rule}")
 
+    def test_yyapi_and_openrouter_rules(self):
+        """yyapi.cloud（含 www 子域）与 openrouter.ai 归入 🌐 海外服务。"""
+        overseas_domains = ("yyapi.cloud", "openrouter.ai")
+        for client in ("clash", "stash", "surge", "loon", "shadowrocket", "qx"):
+            with self.subTest(client=client):
+                if client in ("clash", "stash"):
+                    rules = build_clash_stash(TEMPLATES_DIR / f"{client}.yaml", {}, client)["rules"]
+                else:
+                    output = build_ini_based_client(TEMPLATES_DIR / f"{client}.conf", {}, client)
+                    section = "[filter_local]" if client == "qx" else "[Rule]"
+                    rules = output.split(section, 1)[1].splitlines()
+                for domain in overseas_domains:
+                    rule = (
+                        f"host-suffix, {domain}, 🌐 海外服务"
+                        if client == "qx"
+                        else f"DOMAIN-SUFFIX,{domain},🌐 海外服务"
+                    )
+                    self.assertEqual(rules.count(rule), 1, f"{client} 缺少或重复规则: {rule}")
+
 if __name__ == "__main__":
     unittest.main()
