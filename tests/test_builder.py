@@ -1052,5 +1052,42 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         finally:
             tmp_path.unlink(missing_ok=True)
 
+    def test_overseas_service_and_apple_push_rules(self):
+        """常规海外服务域名走 🌐 海外服务，Apple 推送域走 🍎 Apple，避免落进 MATCH 海外出口。"""
+        overseas_domains = (
+            "axiom.co",
+            "system-stats.com",
+            "pcloud.com",
+            "paseo.sh",
+            "obsidian.md",
+            "npmjs.org",
+            "ohmygame.ai",
+            "usemagpie.ai",
+            "pythonhosted.org",
+            "pypi.org",
+            "alpinelinux.org",
+        )
+        for client in ("clash", "stash", "surge", "loon", "shadowrocket", "qx"):
+            with self.subTest(client=client):
+                if client in ("clash", "stash"):
+                    rules = build_clash_stash(TEMPLATES_DIR / f"{client}.yaml", {}, client)["rules"]
+                else:
+                    output = build_ini_based_client(TEMPLATES_DIR / f"{client}.conf", {}, client)
+                    section = "[filter_local]" if client == "qx" else "[Rule]"
+                    rules = output.split(section, 1)[1].splitlines()
+                for domain in overseas_domains:
+                    rule = (
+                        f"host-suffix, {domain}, 🌐 海外服务"
+                        if client == "qx"
+                        else f"DOMAIN-SUFFIX,{domain},🌐 海外服务"
+                    )
+                    self.assertEqual(rules.count(rule), 1, f"{client} 缺少或重复规则: {rule}")
+                apple_push_rule = (
+                    "host-suffix, push.apple.com, 🍎 Apple"
+                    if client == "qx"
+                    else "DOMAIN-SUFFIX,push.apple.com,🍎 Apple"
+                )
+                self.assertEqual(rules.count(apple_push_rule), 1, f"{client} 缺少或重复规则: {apple_push_rule}")
+
 if __name__ == "__main__":
     unittest.main()
