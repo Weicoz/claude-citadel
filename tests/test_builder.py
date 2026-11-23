@@ -851,14 +851,14 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         self.assertEqual(fallback["proxies"][0], "波特兰 SOCKS5", "原出口（中转链路）应作为首选项")
 
         proxies = {p["name"]: p for p in config["proxies"]}
-        self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "⛓ [猫咪云] 香港-01")
+        self.assertEqual(proxies["[猫咪云] 香港-01 → 波特兰 SOCKS5"]["dialer-proxy"], "🔗 [猫咪云] 香港-01")
         self.assertEqual(proxies["🇯🇵 自建日本直连 → 波特兰 SOCKS5"]["dialer-proxy"], "🇯🇵 自建日本直连")
         self.assertNotIn("benchmark-url", proxies["🇯🇵 自建日本直连 → 波特兰 SOCKS5"], "组合条目应裁掉单点测速字段")
-        self.assertIn("⛓ [猫咪云] 香港-01", proxies, "订阅节点未内联为隐藏静态节点")
+        self.assertIn("🔗 [猫咪云] 香港-01", proxies, "订阅节点未内联为隐藏静态节点")
 
         # 内联节点不得混入中转池，避免污染测速与地区组
         relay_group = next(g for g in config["proxy-groups"] if g["name"] == "🔀 中转节点")
-        self.assertNotIn("⛓ [猫咪云] 香港-01", relay_group.get("proxies") or [])
+        self.assertNotIn("🔗 [猫咪云] 香港-01", relay_group.get("proxies") or [])
 
     def test_chain_groups_configurable(self):
         """chain_groups 可自定义命名与探测参数，也可逐个关闭。"""

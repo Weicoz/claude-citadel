@@ -43,7 +43,7 @@ DEFAULT_STANDBY_INTERVAL = 300
 # 否则组合条目的 dialer-proxy 会指向不存在的节点名，整个配置直接加载失败。
 DEFAULT_EXCLUDE_TYPES = "direct|reject|compatible|pass"
 DEFAULT_SUB_USER_AGENT = "clash.meta"
-HIDDEN_NODE_PREFIX = "⛓ "
+HIDDEN_NODE_PREFIX = "🔗 "
 
 
 def build_subscription_prefix(name):
@@ -370,7 +370,7 @@ def apply_custom_rules_clash(config, custom_rules, diy_groups=None, client_type=
 # 海外出口链路组合：把「每个前置节点 × 每个出口」展开成可直接点选的固定条目
 # ---------------------------------------------------------------------------
 # dialer-proxy 只在配置解析阶段按名字查静态节点，proxy-providers 注入的节点此时还不存在，
-# 所以订阅节点必须内联成隐藏静态节点（⛓ 前缀），否则 mihomo 会报 dialer-proxy not found。
+# 所以订阅节点必须内联成隐藏静态节点（🔗 前缀），否则 mihomo 会报 dialer-proxy not found。
 _SUBSCRIPTION_NODE_CACHE = {}
 # 订阅拉取重试次数与首次退避秒数（按次数线性递增）
 SUB_FETCH_ATTEMPTS = 4
