@@ -277,7 +277,7 @@ custom_rules:
 3. 勾选使用该配置。
 
 > [!NOTE]
-> Stash 不支持为 rule-providers 指定下载代理。因此 `stash.yaml` 的规则集统一使用 `fastly.jsdelivr.net` 镜像（Stash 官方文档示例所用域名），并在规则中把该域名固定为 `DIRECT`：规则集在客户端启动时就要下载，一旦下载链路依赖机场节点存活，节点未就绪或抖动就会出现「直连规则 / 规则集加载为空」；直连机器上的 CDN 反而最稳。`cdn.jsdelivr.net` 在国内长期不稳定（DNS 污染 / TCP 阻断），是规则集更新失败最常见的原因，不要换回去。若你的网络连 fastly 也不可达，可把 `fastly.jsdelivr.net/gh/` 整体替换为可访问的 GitHub 代理前缀，并同步改掉那条 `DOMAIN,fastly.jsdelivr.net,DIRECT`。jsDelivr 对分支地址有约 12 小时 CDN 缓存，规则更新不会立即生效。
+> Stash 不支持为 rule-providers 指定下载代理。因此 `stash.yaml` 的规则集统一使用 `fastly.jsdelivr.net` 镜像（Stash 官方文档示例所用域名），并在规则中把该域名固定为 `DIRECT`：规则集在客户端启动时就要下载，一旦下载链路依赖机场节点存活，节点未就绪或抖动就会出现「直连规则 / 规则集加载为空」；直连机器上的 CDN 反而最稳。`cdn.jsdelivr.net` 在国内长期不稳定（DNS 污染 / TCP 阻断），是规则集更新失败最常见的原因，不要换回去。其余客户端（Clash / Surge / Loon / Shadowrocket / Quantumult X）的 CDN 路由规则同样已从 `cdn.jsdelivr.net` 统一改为 `fastly.jsdelivr.net`，`cdn.jsdelivr.net` 本身仍由 `gfw` 规则集的 `+.jsdelivr.net` 兜底走海外服务。若你的网络连 fastly 也不可达，可把 `fastly.jsdelivr.net/gh/` 整体替换为可访问的 GitHub 代理前缀，并同步改掉那条 `DOMAIN,fastly.jsdelivr.net,DIRECT`。jsDelivr 对分支地址有约 12 小时 CDN 缓存，规则更新不会立即生效。
 
 ### 3. Surge (iOS / macOS)
 1. 复制 `.../raw/claude-citadel-surge.conf`。

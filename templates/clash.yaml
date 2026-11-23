@@ -192,7 +192,7 @@ rules:
 - DOMAIN-SUFFIX,dalvdm.cc,DIRECT
 - DOMAIN-SUFFIX,ezdmw.org,DIRECT
 - DOMAIN-SUFFIX,sorani.net,DIRECT
-- DOMAIN,cdn.jsdelivr.net,🌐 海外服务
+- DOMAIN,fastly.jsdelivr.net,🌐 海外服务
 - DOMAIN,unpkg.com,🌐 海外服务
 - DOMAIN-SUFFIX,amytele.co,🌐 海外服务
 - DOMAIN-SUFFIX,t3.codes,🌐 海外服务

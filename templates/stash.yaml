@@ -173,9 +173,8 @@ rules:
 - DOMAIN-SUFFIX,dalvdm.cc,DIRECT
 - DOMAIN-SUFFIX,ezdmw.org,DIRECT
 - DOMAIN-SUFFIX,sorani.net,DIRECT
-- DOMAIN,cdn.jsdelivr.net,🌐 海外服务
-# 规则集镜像走直连：Stash 不支持给 rule-providers 指定代理，桌面端也保持一致，
-# 避免「规则集下载依赖机场节点存活」造成的空规则集（启动即拉取、拉取失败即空）。
+# 规则集镜像直连下载：Stash 不支持给 rule-providers 指定代理，客户端启动即拉取，
+# 若下载链路依赖机场节点存活，节点未就绪或抖动就会得到空规则集。
 - DOMAIN,fastly.jsdelivr.net,DIRECT
 - DOMAIN,unpkg.com,🌐 海外服务
 - DOMAIN-SUFFIX,amytele.co,🌐 海外服务

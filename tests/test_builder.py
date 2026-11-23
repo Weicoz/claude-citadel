@@ -97,7 +97,9 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
 
     def test_shared_cdns_use_overseas_service_before_claude(self):
         """共享 CDN 优先走海外服务；Cloudflare 自有域走海外出口，测速域直连。"""
-        hosts = ("cdn.jsdelivr.net", "unpkg.com")
+        # cdn.jsdelivr.net 在国内长期不稳定，配置内统一改用 fastly.jsdelivr.net；
+        # cdn 域名仍由 gfw 规则集的 +.jsdelivr.net 兜底。
+        hosts = ("fastly.jsdelivr.net", "unpkg.com")
         dedicated = yaml.safe_load((ROOT / "rules/claude.yaml").read_text())["payload"]
         plain = [line for line in (ROOT / "rules/claude.list").read_text().splitlines()
                  if line and not line.startswith("#")]
@@ -116,8 +118,13 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
                     rules = output.split(section, 1)[1].splitlines()
                     guard = next(i for i, rule in enumerate(rules) if "claude.ai" in rule)
                 for host in hosts:
-                    rule = (f"host, {host}, 🌐 海外服务" if client == "qx"
-                            else f"DOMAIN,{host},🌐 海外服务")
+                    if client == "qx":
+                        rule = f"host, {host}, 🌐 海外服务"
+                    elif client == "stash" and host == "fastly.jsdelivr.net":
+                        # Stash 拉不到规则集时下载代理不可用，镜像直连最稳
+                        rule = f"DOMAIN,{host},DIRECT"
+                    else:
+                        rule = f"DOMAIN,{host},🌐 海外服务"
                     self.assertEqual(rules.count(rule), 1)
                     self.assertLess(rules.index(rule), guard)
                 if client == "qx":
