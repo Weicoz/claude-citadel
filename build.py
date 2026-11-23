@@ -437,6 +437,26 @@ def provider_key(name):
     return (match.group(1) if match else str(name or "")).strip().lower()
 
 
+def resolve_auto_exclude(relays_cfg):
+    """profile.relays.exclude_from_auto：不加入自动择优与 Fallback 的来源名。
+
+    与 relays.order 共用来源匹配规则（订阅 name、节点名里的 [前缀] 或完整节点名，大小写不敏感）；
+    缺省返回空集合，保持全部中转节点都参与自动择优与 Fallback。
+    """
+    raw = (relays_cfg or {}).get("exclude_from_auto") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    return {str(item).strip().lower() for item in raw if str(item).strip()}
+
+
+def is_excluded_from_auto(name, excluded):
+    """判断订阅或节点是否命中 exclude_from_auto。"""
+    if not excluded:
+        return False
+    raw = str(name or "").strip().lower()
+    return raw in excluded or provider_key(name) in excluded
+
+
 def order_by_provider(items, order, name_of=None):
     """按 relays.order 稳定排序；未列出的来源排在已列出的之后，保持原序。"""
     if not order:
@@ -534,12 +554,14 @@ def resolve_chain_group_options(chain_cfg):
     }
 
 
-def expand_chain_exits(claude_custom, pool, chain_cfg=None):
+def expand_chain_exits(claude_custom, pool, chain_cfg=None, auto_exclude=None):
     """按出口分块展开：原出口 → 自动择优 / Fallback → 链路清单或全部固定链路。
 
+    auto_exclude 命中的前置节点只保留在手动链路清单，不进入自动择优与 Fallback。
     返回 (条目列表, 隐藏节点列表, 新增策略组, 出口组内的条目顺序)。
     """
     opts = resolve_chain_group_options(chain_cfg)
+    excluded = auto_exclude or set()
     expanded, hidden, aux_groups, group_order = [], [], [], []
     hidden_seen = set()
 
@@ -551,6 +573,7 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
         group_order.append(exit_name)
 
         combo_names = []
+        auto_combo_names = []
         for display, node, is_inline in pool:
             combo = copy.deepcopy(p)
             # 组合条目由策略组统一测速，出口自带的单点测速字段没有意义，裁掉可省约 10% 体积
@@ -561,6 +584,8 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
             combo["dialer-proxy"] = node["name"]
             expanded.append(combo)
             combo_names.append(combo["name"])
+            if not is_excluded_from_auto(display, excluded):
+                auto_combo_names.append(combo["name"])
             if is_inline and node["name"] not in hidden_seen:
                 hidden_seen.add(node["name"])
                 hidden.append(node)
@@ -568,6 +593,7 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
         # 出口自身也是一条链路：「🔀 中转节点 → 出口」。漏掉它，择优/回退/链路
         # 清单里就只剩「机场节点 → 出口」，无法选中默认中转这条路径。
         combo_names.insert(0, exit_name)
+        auto_combo_names.insert(0, exit_name)
 
         if not combo_names:
             continue
@@ -576,14 +602,14 @@ def expand_chain_exits(claude_custom, pool, chain_cfg=None):
             auto_name = opts["names"]["auto_select"].format(exit=exit_name)
             aux_groups.append(dict(
                 {"name": auto_name, "type": "url-test", "lazy": opts["lazy"],
-                 "tolerance": opts["tolerance"], "proxies": list(combo_names)}, **opts["probe"]))
+                 "tolerance": opts["tolerance"], "proxies": list(auto_combo_names)}, **opts["probe"]))
             group_order.append(auto_name)
 
         if opts["fallback"]:
             fallback_name = opts["names"]["fallback"].format(exit=exit_name)
             aux_groups.append(dict(
                 {"name": fallback_name, "type": "fallback", "lazy": opts["lazy"],
-                 "proxies": list(combo_names)}, **opts["probe"]))
+                 "proxies": list(auto_combo_names)}, **opts["probe"]))
             group_order.append(fallback_name)
 
         if opts["picker"]:
@@ -630,13 +656,15 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     claude_custom = claude_cfg.get("custom_proxies", []) or []
     claude_subs = claude_cfg.get("subscriptions", []) or []
 
+    auto_exclude = resolve_auto_exclude(relays_cfg)
+
     # 链路组合：每个前置节点 × 每个出口展开成固定条目，选中即完整链路
     chain_hidden, chain_groups, chain_order = [], [], []
     if claude_cfg.get("chain_all_relay_nodes"):
         chain_pool = build_chain_pool(relays_cfg)
         exit_count = len([p for p in claude_custom if isinstance(p, dict) and p.get("name")])
         claude_custom, chain_hidden, chain_groups, chain_order = expand_chain_exits(
-            claude_custom, chain_pool, claude_cfg.get("chain_groups"))
+            claude_custom, chain_pool, claude_cfg.get("chain_groups"), auto_exclude=auto_exclude)
         combo_count = len(claude_custom) - exit_count
         log(f"海外出口链路组合：前置节点 {len(chain_pool)} 个 × 出口 {exit_count} 个 = {combo_count} 条组合"
             f"（另含 {exit_count} 条原出口、{len(chain_groups)} 个组合策略组）")
@@ -707,6 +735,7 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
 
     providers = {}
     relay_provider_ids = []
+    auto_provider_ids = []
     claude_provider_ids = []
 
     for idx, s in enumerate(relay_subs, 1):
@@ -714,6 +743,8 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             continue
         pid = s.get("id") or f"{sanitize_id(s.get('name', f'sub_{idx}'))}_{idx}"
         relay_provider_ids.append(pid)
+        if not is_excluded_from_auto(s.get("name", pid), auto_exclude):
+            auto_provider_ids.append(pid)
         prefix = build_subscription_prefix(s.get("name", pid))
 
         is_primary = (idx == 1)
@@ -870,6 +901,11 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
     relay_proxies_summary.extend(sort_groups_by_provider(provider_entries, provider_order))
     relay_proxies_summary.extend(relay_custom_names)
 
+    auto_custom_names = [
+        name for name in relay_custom_names
+        if not is_excluded_from_auto(name, auto_exclude)
+    ]
+
     groups = config.get("proxy-groups", [])
     new_groups = []
 
@@ -920,9 +956,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
             new_groups.append(g)
 
         elif g_name == "⚡ 自动择优":
-            if relay_provider_ids:
-                g["use"] = relay_provider_ids
-            g["proxies"] = relay_custom_names.copy()
+            if auto_provider_ids:
+                g["use"] = auto_provider_ids
+            if auto_custom_names:
+                g["proxies"] = auto_custom_names.copy()
+            elif auto_provider_ids:
+                g.pop("proxies", None)
+            else:
+                g["proxies"] = []
             g["url"] = DEFAULT_PROBE_URL
             g["expected-status"] = DEFAULT_EXPECTED_STATUS
             g["interval"] = DEFAULT_PRIMARY_INTERVAL
@@ -942,13 +983,17 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                         elif isinstance(p, str):
                             fb_proxies.append(p)
                     g["proxies"] = fb_proxies
-                elif relay_custom_names:
-                    g["proxies"] = relay_custom_names.copy()
+                elif auto_custom_names:
+                    g["proxies"] = auto_custom_names.copy()
+                elif auto_provider_ids or custom_fallback_def.get("use"):
+                    g.pop("proxies", None)
+                else:
+                    g["proxies"] = []
 
                 if "use" in custom_fallback_def:
                     g["use"] = custom_fallback_def["use"]
-                elif not custom_fallback_def.get("proxies") and relay_provider_ids:
-                    g["use"] = relay_provider_ids
+                elif not custom_fallback_def.get("proxies") and auto_provider_ids:
+                    g["use"] = auto_provider_ids
                 elif "use" in g and not custom_fallback_def.get("use"):
                     del g["use"]
 
@@ -962,9 +1007,14 @@ def build_clash_stash(template_path, profile_data, client_type="clash"):
                 if "interval" not in g:
                     g["interval"] = DEFAULT_PRIMARY_INTERVAL
             else:
-                if relay_provider_ids:
-                    g["use"] = relay_provider_ids
-                g["proxies"] = relay_custom_names.copy()
+                if auto_provider_ids:
+                    g["use"] = auto_provider_ids
+                if auto_custom_names:
+                    g["proxies"] = auto_custom_names.copy()
+                elif auto_provider_ids:
+                    g.pop("proxies", None)
+                else:
+                    g["proxies"] = []
                 g["url"] = DEFAULT_PROBE_URL
                 g["expected-status"] = DEFAULT_EXPECTED_STATUS
                 g["interval"] = DEFAULT_PRIMARY_INTERVAL

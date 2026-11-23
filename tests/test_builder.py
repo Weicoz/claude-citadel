@@ -951,5 +951,106 @@ class TestClaudeCitadelBuilder(unittest.TestCase):
         finally:
             bad.unlink(missing_ok=True)
 
+    def test_relays_exclude_from_auto(self):
+        """exclude_from_auto 命中的来源不得进入自动择优与 Fallback（含出口链路组），但保留在手动组。"""
+        from unittest import mock
+        import build as build_module
+
+        profile = {
+            "claude_exits": {
+                "chain_all_relay_nodes": True,
+                "use_relay_chain": True,
+                "custom_proxies": [
+                    {"name": "波特兰 SOCKS5", "type": "socks5", "server": "198.51.100.1", "port": 1080}
+                ],
+            },
+            "relays": {
+                "order": ["常规机场", "珍贵机场", "Amy"],
+                "exclude_from_auto": ["Amy", "珍贵机场"],
+                "subscriptions": [
+                    {"name": "常规机场", "emoji": "🐱", "url": "https://sub.normal.com/sub"},
+                    {"name": "珍贵机场", "emoji": "💎", "url": "https://sub.vip.com/sub"},
+                ],
+                "custom_proxies": [
+                    {"name": "[Amy] 🇭🇰 香港 01", "type": "ss", "server": "198.51.100.2", "port": 8388},
+                    {"name": "🇯🇵 自建日本直连", "type": "ss", "server": "198.51.100.3", "port": 8388},
+                ],
+            },
+            "diy_groups": [
+                {"name": "⚡ Amy 自动择优", "type": "url-test", "filter": "(?i)Amy"},
+                {"name": "✈️ Amy", "type": "select", "filter": "(?i)Amy"},
+            ],
+        }
+
+        def fake_fetch(sub):
+            if sub["name"] == "常规机场":
+                return [{"name": "香港-01", "type": "ss", "server": "198.51.100.4", "port": 8388}]
+            return [{"name": "日本-01", "type": "ss", "server": "198.51.100.5", "port": 8388}]
+
+        for tpl, client in ((self.clash_tpl, "clash"), (self.stash_tpl, "stash")):
+            with self.subTest(client=client), mock.patch.object(
+                build_module, "fetch_subscription_nodes", side_effect=fake_fetch
+            ):
+                cfg = build_clash_stash(tpl, profile, client)
+                groups = {g["name"]: g for g in cfg["proxy-groups"]}
+
+                # 全局自动择优与 Fallback：排除 Amy 与 珍贵机场，保留 常规机场 与 未排除手动节点
+                for g_name in ("⚡ 自动择优", "🛟 Fallback"):
+                    g = groups[g_name]
+                    self.assertEqual(g.get("use"), ["sub_1_1"] if "sub_1_1" in cfg["proxy-providers"] else [
+                        pid for pid in cfg["proxy-providers"] if pid.endswith("_1")
+                    ])
+                    self.assertEqual(g.get("proxies"), ["🇯🇵 自建日本直连"])
+                    self.assertNotIn("[Amy] 🇭🇰 香港 01", g.get("proxies") or [])
+
+                # 出口链路自动择优与 Fallback：排除 Amy 与 珍贵机场链路，保留原出口与未排除链路
+                for g_name in ("⚡ 波特兰 SOCKS5 自动择优", "🛟 波特兰 SOCKS5 Fallback"):
+                    members = groups[g_name]["proxies"]
+                    self.assertEqual(members, [
+                        "波特兰 SOCKS5",
+                        "[常规机场] 香港-01 → 波特兰 SOCKS5",
+                        "🇯🇵 自建日本直连 → 波特兰 SOCKS5",
+                    ])
+
+                # 手动选择组仍保留 Amy 与 珍贵机场，方便显式点选
+                picker = groups["📍 波特兰 SOCKS5 链路"]["proxies"]
+                self.assertIn("[Amy] 🇭🇰 香港 01 → 波特兰 SOCKS5", picker)
+                self.assertIn("[珍贵机场] 日本-01 → 波特兰 SOCKS5", picker)
+                self.assertIn("[Amy] 🇭🇰 香港 01", groups["✈️ Amy"]["proxies"])
+                self.assertIn("[Amy] 🇭🇰 香港 01", groups["⚡ Amy 自动择优"]["proxies"])
+                self.assertIn("[Amy] 🇭🇰 香港 01", groups["🔀 中转节点"]["proxies"])
+                self.assertIn("[Amy] 🇭🇰 香港 01", groups["🇭🇰 香港节点"]["proxies"])
+
+        # 仅剩被排除的手动节点 + 常规订阅时，自动择优与 Fallback 不得留空 proxies 列表，且需通过内核校验
+        only_amy_custom = {
+            "relays": {
+                "exclude_from_auto": ["Amy"],
+                "subscriptions": [{"name": "nvenix", "emoji": "💠", "url": "https://sub.normal.com/sub"}],
+                "custom_proxies": [
+                    {
+                        "name": "[Amy] 🇭🇰 香港 01",
+                        "type": "ss",
+                        "server": "198.51.100.2",
+                        "port": 8388,
+                        "cipher": "aes-256-gcm",
+                        "password": "dummy-test-password",
+                    }
+                ],
+            }
+        }
+        cfg_clean = build_clash_stash(self.clash_tpl, only_amy_custom, "clash")
+        groups_clean = {g["name"]: g for g in cfg_clean["proxy-groups"]}
+        for g_name in ("⚡ 自动择优", "🛟 Fallback"):
+            self.assertEqual(groups_clean[g_name]["use"], ["nvenix_1"])
+            self.assertNotIn("proxies", groups_clean[g_name])
+
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".yaml", delete=False) as f:
+            yaml.dump(cfg_clean, f, allow_unicode=True, sort_keys=False)
+            tmp_path = Path(f.name)
+        try:
+            self.assertTrue(validate_with_mihomo(tmp_path))
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
 if __name__ == "__main__":
     unittest.main()

@@ -145,6 +145,12 @@ relays:
   # 名字取自订阅 name 或节点名里的 [前缀]；未列出的来源排在最后，留空则保持原顺序。
   order: ["liangxin", "miaona", "Amy"]
 
+  # 不加入自动择优与 Fallback 的来源（可选，仅对 Clash / Stash 生效）：
+  # 匹配规则同 order（订阅 name、节点名 [前缀] 或完整节点名，大小写不敏感）。
+  # 命中来源会从 ⚡ 自动择优、🛟 Fallback 及出口链路自动择优 / Fallback 中排除，
+  # 仍保留在手动中转组、地区组、📍 出口链路与专属 DIY 组中供手动点选。
+  exclude_from_auto: ["Amy"]
+
   # 手动直连中转节点 (如自建香港/日本直连 VPS)
   custom_proxies:
     - name: "🇯🇵 自建日本直连"
